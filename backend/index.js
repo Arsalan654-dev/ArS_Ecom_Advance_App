@@ -18,7 +18,7 @@ const PORT = process.env.PORT;
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
-    'https://vingo-frontend.vercel.app',  // Your Vercel URL (update after deploy)
+    'https://vingo-frontend-zeta.vercel.app',  // Your Vercel URL (update after deploy)
     'https://*.vercel.app',
     process.env.FRONTEND_URL
 ];
