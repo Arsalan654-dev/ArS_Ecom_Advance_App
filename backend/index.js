@@ -12,24 +12,32 @@ import addressRouter from './routes/address.routes.js';
 
 
 const app = express();
-const PORT = process.env.PORT || 8000;
+const PORT = process.env.PORT;
 
 
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
-    'https://ars-vingo-app.vercel.app',  // Tumhara Vercel URL
-    'https://ars-vingo-app-git-main-jaffriarsalan786-gmailcoms-projects.vercel.app',
-    'https://ars-vingo-9rctnm8kt-jaffriarsalan786-gmailcoms-projects.vercel.app',
-    '*.vercel.app',
+    'https://vingo-frontend.vercel.app',  // Your Vercel URL (update after deploy)
+    'https://*.vercel.app',
     process.env.FRONTEND_URL
 ];
 
-
 app.use(cors({
-    origin: allowedOrigins,
-    credentials: true, // Allow cookies to be sent with requests
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+            callback(null, true);
+        } else {
+            console.log('Origin blocked:', origin);
+            callback(null, true); // For development, allow all
+            // callback(new Error('Not allowed by CORS')); // For production
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 

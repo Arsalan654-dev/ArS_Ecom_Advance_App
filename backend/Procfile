@@ -1,0 +1,3 @@
+# D:\Vingo\backend\Procfile
+
+web: node index.js
