@@ -1,6 +1,15 @@
 {
+
+
+    "build": {
+    "builder": "DOCKERFILE",
+    "buildCommand": "docker build -t vingo-backend ."
+  },
   "deploy": {
     "startCommand": "node index.js",
-    "restartPolicyType": "ON_FAILURE"
+    "restartPolicyType": "ON_FAILURE",
+    "healthcheckPath": "/",
+    "healthcheckTimeout": 100,
+    "numReplicas": 1
   }
 }
