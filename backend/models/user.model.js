@@ -105,6 +105,36 @@ const userSchema = new mongoose.Schema({
     timestamps: true
 });
 
+// Add pre-hook for cascade delete
+userSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
+    try {
+        // Delete all addresses associated with this user
+        const Address = mongoose.model('Address');
+        await Address.deleteMany({ user: this._id });
+        console.log(`✅ Deleted all addresses for user: ${this._id}`);
+        next();
+    } catch (error) {
+        console.error("Error deleting user addresses:", error);
+        next(error);
+    }
+});
+
+// Also handle findOneAndDelete
+userSchema.pre('findOneAndDelete', async function(next) {
+    try {
+        const user = await this.model.findOne(this.getFilter());
+        if (user) {
+            const Address = mongoose.model('Address');
+            await Address.deleteMany({ user: user._id });
+            console.log(`✅ Deleted all addresses for user: ${user._id}`);
+        }
+        next();
+    } catch (error) {
+        console.error("Error deleting user addresses:", error);
+        next(error);
+    }
+});
+
 
 
 const User = mongoose.model("User", userSchema);

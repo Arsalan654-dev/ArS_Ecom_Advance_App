@@ -85,5 +85,20 @@ const addressSchema = new mongoose.Schema({
 });
 
 
+// Add this after schema definition
+addressSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
+    try {
+        const User = mongoose.model('User');
+        await User.updateMany(
+            { addresses: this._id },
+            { $pull: { addresses: this._id } }
+        );
+        next();
+    } catch (error) {
+        next(error);
+    }
+});
+
+
 const Address = mongoose.model("Address", addressSchema);
 export default Address;
