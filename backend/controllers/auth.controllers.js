@@ -1,10 +1,9 @@
 import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
-import { sentOtpEmail, sendVerificationEmail, sendWelcomeEmail, sendTwoFactorOtpEmail } from "../utils/mail.js";
+import { sendOtpEmail, sendVerificationEmail, sendWelcomeEmail, sendTwoFactorOtpEmail } from "../utils/mail.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { deleteFromCloudinary, uploadToCloudinary } from "../config/cloudinary.js";
-import { OAuth2Client } from "google-auth-library";
 import { emailQueue } from "../utils/emailQueue.js";
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
@@ -65,12 +64,11 @@ const persistAndSendTwoFactorOtp = async (user, purpose) => {
 
 
 
-// D:\Vingo\backend\controllers\auth.controllers.js - Update signUp
-
+// Sign up
 export const signUp = async (req, res) => {
     try {
-        console.log("========== SIGNUP ==========");
         const { fullName, email, password, mobile, role } = req.body;
+        console.log("📝 User signup attempt:", email);
         
         // Validation
         if (!fullName || !email || !password || !mobile || !role) {
@@ -98,10 +96,10 @@ export const signUp = async (req, res) => {
         
         const hashedPassword = await bcrypt.hash(password, 10);
 
-         // Generate email verification token (YE LINE IMPORTANT HAI)
+         // Generate email verification token
         const emailVerificationToken = crypto.randomBytes(32).toString('hex');
         
-        // Create user WITHOUT setting googleId field
+        // Create user
         const newUser = await User.create({
             fullName,
             email,
@@ -110,8 +108,7 @@ export const signUp = async (req, res) => {
             role,
              isEmailVerified: false,
             emailVerificationToken: emailVerificationToken,
-            emailVerificationExpires: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-            // Don't include googleId at all - let it be undefined
+            emailVerificationExpires: Date.now() + 24 * 60 * 60 * 1000
         });
         
 
@@ -150,15 +147,13 @@ export const signUp = async (req, res) => {
 
 
 
-
-// controllers/auth.controllers.js - signIn function replace karo
-
+// Sign in
 export const signIn = async (req, res) => {
     try {
-        console.log("========== SIGNIN ATTEMPT ==========");
-        console.log("Request body:", req.body);
-
+        
         const { email, password } = req.body;
+        
+        console.log("👤 User signin attempt:", email);
 
         if (!email || !password) {
             return res.status(400).json({ error: "Email and password are required" });
@@ -250,18 +245,23 @@ export const signIn = async (req, res) => {
 
 export const signOut = async (req, res) => {
     try {
-        // Implement sign-out logic here (e.g., clear the authentication token)
-        res.clearCookie("token");
-        return res.status(200).json({ message: "User logged out successfully" });
-    }
-    catch (error) {
+        res.clearCookie("token", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict"
+        });
+        return res.status(200).json({ 
+            success: true,
+            message: "User logged out successfully" 
+        });
+    } catch (error) {
+        console.error("Signout error:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 };
 
 
-// controllers/auth.controllers.js - Update sendOtp, verifyOtp, resetPassword
-
+// Send OTP for password reset
 export const sendOtp = async (req, res) => {
     try {
         const { email } = req.body;
@@ -647,15 +647,14 @@ export const resendTwoFactorLoginOtp = async (req, res) => {
     }
 };
 
-const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 
 // ============= GOOGLE LOGIN - WORKING VERSION =============
 export const googleLogin = async (req, res) => {
     try {
-        console.log("========== GOOGLE LOGIN ==========");
-
+        
         const { email, name, picture, googleId, avatar } = req.body;
+        console.log("🔐 Google login attempt:", email);
 
         if (!email) {
             return res.status(400).json({ error: "Email is required" });
@@ -800,8 +799,7 @@ export const updateProfile = async (req, res) => {
 
 
 
-// controllers/auth.controllers.js - Update getProfile
-
+// Get profile
 export const getProfile = async (req, res) => {
     try {
         const userId = req.userId;
@@ -819,7 +817,7 @@ export const getProfile = async (req, res) => {
 };
 
 
-// Email Verification
+// Verify email address
 export const verifyEmail = async (req, res) => {
     try {
         const { token } = req.params;
@@ -887,8 +885,7 @@ export const resendVerificationEmail = async (req, res) => {
 
 
 
-
-// Change Password
+// Change password
 export const changePassword = async (req, res) => {
     try {
         const userId = req.userId;
@@ -927,7 +924,7 @@ export const changePassword = async (req, res) => {
     }
 };
 
-// Upload Profile Picture
+// Upload profile picture
 export const uploadProfilePicture = async (req, res) => {
     try {
         const userId = req.userId;
@@ -965,6 +962,76 @@ export const uploadProfilePicture = async (req, res) => {
         console.error("Upload profile picture error:", error);
         res.status(500).json({ 
             error: "Failed to upload profile picture",
+            details: error.message 
+        });
+    }
+};
+
+// Delete User Account
+export const deleteAccount = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { password } = req.body;
+
+        if (!password) {
+            return res.status(400).json({ error: "Password is required to delete account" });
+        }
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ error: "Password is incorrect" });
+        }
+
+        console.log(`🗑️ Deleting user account: ${user._id}`);
+
+        await User.deleteOne({ _id: userId });
+
+        console.log(`✅ User account deleted successfully: ${userId}`);
+
+        res.clearCookie("token");
+
+        return res.status(200).json({ 
+            success: true,
+            message: "Account deleted successfully. All associated data has been removed." 
+        });
+
+    } catch (error) {
+        console.error("Delete account error:", error);
+        res.status(500).json({ 
+            error: "Failed to delete account",
+            details: error.message 
+        });
+    }
+};
+
+// Download Profile as PDF
+export const downloadProfilePDF = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const user = await User.findById(userId).populate('addresses');
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        const { generateUserProfilePDF } = await import('../utils/pdfGenerator.js');
+        
+        const pdfBuffer = await generateUserProfilePDF(user, user.addresses || []);
+
+        res.contentType('application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Vingo_Profile_${user.fullName.replace(/\s+/g, '_')}_${Date.now()}.pdf"`);
+        res.send(pdfBuffer);
+
+    } catch (error) {
+        console.error("Download PDF error:", error);
+        res.status(500).json({ 
+            error: "Failed to generate PDF",
             details: error.message 
         });
     }

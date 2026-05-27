@@ -46,6 +46,10 @@ const Profile = () => {
     });
 
     const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [deletePassword, setDeletePassword] = useState('');
+    const [deleting, setDeleting] = useState(false);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
 
     useEffect(() => {
         fetchProfile();
@@ -359,6 +363,71 @@ const Profile = () => {
         }
     };
 
+    const handleDownloadPDF = async () => {
+        setDownloadingPdf(true);
+        try {
+            const token = localStorage.getItem('token');
+            const response = await axios.get(
+                `${API_URL}/api/auth/download-pdf`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    withCredentials: true,
+                    responseType: 'blob'
+                }
+            );
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            const fileName = `Vingo_Profile_${user?.fullName?.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
+            link.parentChild.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+            toast.success('Profile downloaded as PDF!');
+        } catch (error) {
+            console.error('PDF download error:', error);
+            toast.error(error.response?.data?.error || 'Failed to download PDF');
+        } finally {
+            setDownloadingPdf(false);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        if (!deletePassword.trim()) {
+            toast.error('Please enter your password');
+            return;
+        }
+
+        setDeleting(true);
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(
+                `${API_URL}/api/auth/delete-account`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    withCredentials: true,
+                    data: { password: deletePassword }
+                }
+            );
+
+            toast.success('Account deleted successfully');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setTimeout(() => {
+                navigate('/signin');
+            }, 1500);
+        } catch (error) {
+            console.error('Delete account error:', error);
+            toast.error(error.response?.data?.error || 'Failed to delete account');
+            setDeletePassword('');
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen flex items-center justify-center">
@@ -595,7 +664,7 @@ const Profile = () => {
                 </div>
 
                 {!user?.googleId && (
-                    <div className="bg-white rounded-lg shadow-lg p-6">
+                    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
                         <h3 className="text-xl font-bold mb-4">Change Password</h3>
                         <div className="space-y-4">
                             <div>
@@ -624,6 +693,84 @@ const Profile = () => {
                             >
                                 {passwordSaving ? 'Changing...' : 'Change Password'}
                             </button>
+                        </div>
+                    </div>
+                )}
+
+                <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <h3 className="text-xl font-bold mb-4">Download & Account</h3>
+                    <div className="space-y-4">
+                        <button
+                            onClick={handleDownloadPDF}
+                            disabled={downloadingPdf}
+                            className="w-full bg-green-600 text-white p-3 rounded-md hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            📄 {downloadingPdf ? 'Downloading...' : 'Download Profile as PDF'}
+                        </button>
+                        <p className="text-sm text-gray-600">
+                            Download your profile information and addresses as a PDF file
+                        </p>
+                    </div>
+                </div>
+
+                <div className="bg-red-50 rounded-lg shadow-lg p-6 border-2 border-red-200">
+                    <h3 className="text-xl font-bold mb-2 text-red-700">Danger Zone</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                        ⚠️ Permanently delete your account. This action cannot be undone. All your data and addresses will be removed.
+                    </p>
+                    <button
+                        onClick={() => setDeleteModalOpen(true)}
+                        className="w-full bg-red-600 text-white p-3 rounded-md hover:bg-red-700"
+                    >
+                        🗑️ Delete Account
+                    </button>
+                </div>
+
+                {deleteModalOpen && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                            <h2 className="text-2xl font-bold text-red-600 mb-4">Delete Account?</h2>
+                            <div className="space-y-4">
+                                <div className="bg-red-50 border-l-4 border-red-600 p-4">
+                                    <p className="text-red-700 text-sm">
+                                        <strong>WARNING:</strong> This is permanent! Your account and all associated data (addresses, preferences) will be permanently deleted. This action cannot be undone.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-gray-700 mb-2">
+                                        Enter your password to confirm deletion
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={deletePassword}
+                                        onChange={(e) => setDeletePassword(e.target.value)}
+                                        placeholder="Your password"
+                                        className="w-full p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                                        disabled={deleting}
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => {
+                                            setDeleteModalOpen(false);
+                                            setDeletePassword('');
+                                        }}
+                                        disabled={deleting}
+                                        className="bg-gray-300 text-gray-700 p-3 rounded-md hover:bg-gray-400 disabled:opacity-50"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteAccount}
+                                        disabled={deleting || !deletePassword.trim()}
+                                        className="bg-red-600 text-white p-3 rounded-md hover:bg-red-700 disabled:opacity-50"
+                                    >
+                                        {deleting ? 'Deleting...' : 'Yes, Delete'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

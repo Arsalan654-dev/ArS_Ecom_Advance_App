@@ -1,4 +1,4 @@
-// D:\Vingo\backend\controllers\address.controllers.js
+// Address controller functions
 
 import Address from "../models/address.model.js";
 import User from "../models/user.model.js";
@@ -50,7 +50,7 @@ export const addAddress = async (req, res) => {
             return res.status(400).json({ error: "Pincode must be 5 or 6 digits" });
         }
 
-        // IMPORTANT: If this address is default, remove default from all other addresses
+        // Important: If this address is default, remove default from all other addresses
         if (isDefault) {
             await Address.updateMany(
                 { user: userId },
@@ -158,7 +158,7 @@ export const getAddressById = async (req, res) => {
     }
 };
 
-// Update address - FIXED VERSION
+// Update address
 export const updateAddress = async (req, res) => {
     try {
         const userId = req.userId;
@@ -181,14 +181,12 @@ export const updateAddress = async (req, res) => {
             instructions
         } = req.body;
 
-        // Find address belonging to this user
         const address = await Address.findOne({ _id: id, user: userId });
 
         if (!address) {
             return res.status(404).json({ error: "Address not found" });
         }
 
-        // ✅ FIX 1: Check the NEW isDefault value, not the old one
         if (isDefault === true) {
             await Address.updateMany(
                 { user: userId, _id: { $ne: address._id } },
@@ -196,7 +194,6 @@ export const updateAddress = async (req, res) => {
             );
         }
 
-        // Update fields
         if (label) address.label = label;
         if (label === "Other" && customLabel) address.customLabel = customLabel;
         if (fullAddress) address.fullAddress = fullAddress;
@@ -204,7 +201,6 @@ export const updateAddress = async (req, res) => {
         if (city) address.city = city;
         if (state) address.state = state;
         
-        // ✅ FIX 2: Allow 5-6 digits pincode
         if (pincode) {
             if (!/^\d{5,6}$/.test(pincode)) {
                 return res.status(400).json({ error: "Pincode must be 5 or 6 digits" });
@@ -217,7 +213,6 @@ export const updateAddress = async (req, res) => {
         if (longitude) address.longitude = longitude;
         if (placeId !== undefined) address.placeId = placeId;
         
-        // Validate phone number if provided
         if (phoneNumber !== undefined) {
             if (phoneNumber && !/^\d{10,13}$/.test(phoneNumber)) {
                 return res.status(400).json({ error: "Phone number must be 10-13 digits" });

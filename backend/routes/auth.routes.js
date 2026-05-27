@@ -19,7 +19,9 @@ import {
     disableTwoFactor,
     resendTwoFactorOtp,
     verifyTwoFactorLogin,
-    resendTwoFactorLoginOtp } from '../controllers/auth.controllers.js';
+    resendTwoFactorLoginOtp,
+    deleteAccount,
+    downloadProfilePDF } from '../controllers/auth.controllers.js';
 import { verifyToken } from '../middleware/auth.middleware.js';
 
 
@@ -47,7 +49,8 @@ authRouter.put('/profile', verifyToken, updateProfile);
 
 authRouter.post('/change-password', verifyToken, changePassword);
 authRouter.post('/upload-avatar', verifyToken, upload.single('avatar'), uploadProfilePicture);
-
+authRouter.delete('/delete-account', verifyToken, deleteAccount);
+authRouter.get('/download-pdf', verifyToken, downloadProfilePDF);
 authRouter.post('/two-factor/setup/request', verifyToken, requestTwoFactorSetup);
 authRouter.post('/two-factor/setup/verify', verifyToken, verifyTwoFactorSetup);
 authRouter.post('/two-factor/disable', verifyToken, disableTwoFactor);

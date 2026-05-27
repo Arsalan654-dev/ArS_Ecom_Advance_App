@@ -118,3 +118,29 @@ export const getTwoFactorOtpEmailTemplate = (name, otp, purpose = 'login') => {
         </html>
     `;
 };
+
+// Add these exports at the end of file
+export const getOtpEmailTemplate = (otp) => {
+    return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: #4F46E5; color: white; padding: 20px; text-align: center; }
+                .otp-code { font-size: 32px; font-weight: bold; color: #4F46E5; text-align: center; padding: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Vingo Password Reset</h1>
+                </div>
+                <div class="otp-code">${otp}</div>
+                <p>Use this OTP to reset your password. It will expire in 10 minutes.</p>
+            </div>
+        </body>
+        </html>
+    `;
+};
