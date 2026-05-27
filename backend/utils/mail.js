@@ -7,52 +7,68 @@ import { getVerificationEmailTemplate, getWelcomeEmailTemplate, getTwoFactorOtpE
 
 const dnsLookup = promisify(dns.lookup);
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const DEFAULT_SENDER = process.env.RESEND_SENDER_EMAIL || 'onboarding@resend.dev';
+const DEFAULT_SENDER = process.env.RESEND_SENDER_EMAIL || 'onboarding@vingo.com';
 const SENDER_NAME = 'Vingo App';
 
-// Get IPv4 address for SMTP server
-const getSMTPHost = async () => {
-    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+// Cache for SMTP hosts
+let smtpHostIPv4 = null;
+
+const getSMTPHostIPv4 = async () => {
+    if (smtpHostIPv4) return smtpHostIPv4;
     
-    // If it's Gmail, force IPv4
-    if (host === 'smtp.gmail.com') {
-        try {
-            const { address } = await dnsLookup('smtp.gmail.com', { family: 4 });
-            console.log(`📧 Resolved ${host} to IPv4: ${address}`);
-            return address;
-        } catch (error) {
-            console.error('DNS resolution failed, using hostname:', error);
-            return host;
-        }
+    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+    try {
+        const { address } = await dnsLookup(host, { family: 4 });
+        smtpHostIPv4 = address;
+        console.log(`📧 Resolved ${host} to IPv4: ${address}`);
+        return address;
+    } catch (error) {
+        console.error('DNS resolution failed:', error);
+        return host;
     }
-    return host;
 };
 
-// Send via SMTP with IPv4
-const sendViaSmtp = async (to, subject, html) => {
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        throw new Error('SMTP not configured');
-    }
+// Provider 1: Brevo SMTP (Best for Railway)
+const sendViaBrevo = async (to, subject, html) => {
+    const transporter = nodemailer.createTransport({
+        host: 'smtp-relay.brevo.com',
+        port: 587,
+        secure: false,
+        auth: {
+            user: process.env.SMTP_BREVO_USER || process.env.SMTP_USER,
+            pass: process.env.SMTP_BREVO_PASS || process.env.SMTP_BREVO_PASS
+        },
+        connectionTimeout: 10000,
+        socketTimeout: 10000,
+        tls: { rejectUnauthorized: false }
+    });
 
-    console.log('📧 Sending via SMTP to:', to);
-    
-    const smtpHost = await getSMTPHost();
+    const info = await transporter.sendMail({
+        from: `${SENDER_NAME} <${process.env.SMTP_BREVO_USER || process.env.SMTP_USER}>`,
+        to,
+        subject,
+        html
+    });
+
+    return { success: true, provider: 'brevo', messageId: info.messageId };
+};
+
+// Provider 2: Gmail SMTP with IPv4
+const sendViaGmailSMTP = async (to, subject, html) => {
+    const smtpHost = await getSMTPHostIPv4();
     
     const transporter = nodemailer.createTransport({
         host: smtpHost,
-        port: 587,  // Force port 587
-        secure: false,
+        port: 465,  // Use 465 instead of 587 for Gmail
+        secure: true,  // SSL
         auth: {
             user: process.env.SMTP_USER,
             pass: process.env.SMTP_PASS
         },
-        connectionTimeout: 30000,
-        greetingTimeout: 30000,
-        socketTimeout: 30000,
-        tls: {
-            rejectUnauthorized: false
-        },
-        family: 4  // Force IPv4
+        connectionTimeout: 15000,
+        socketTimeout: 15000,
+        tls: { rejectUnauthorized: false },
+        family: 4
     });
 
     const info = await transporter.sendMail({
@@ -62,61 +78,54 @@ const sendViaSmtp = async (to, subject, html) => {
         html
     });
 
-    console.log('✅ SMTP success:', info.messageId);
-    return { success: true, messageId: info.messageId };
+    return { success: true, provider: 'gmail', messageId: info.messageId };
 };
 
-// Send via Resend (fallback)
+// Provider 3: Resend
 const sendViaResend = async (to, subject, html) => {
     if (!resend) throw new Error('Resend not configured');
-    
-    console.log('📧 Sending via Resend to:', to);
     
     const result = await resend.emails.send({
         from: `${SENDER_NAME} <${DEFAULT_SENDER}>`,
         to: [to],
         subject,
-        html,
-        replyTo: 'support@vingo.com'
+        html
     });
 
-    if (!result || !result.id) {
-        throw new Error('Resend failed');
-    }
-
-    console.log('✅ Resend success:', result.id);
-    return { success: true, messageId: result.id };
+    if (!result?.id) throw new Error('Resend failed');
+    return { success: true, provider: 'resend', messageId: result.id };
 };
 
-// Main send function
+
+
+
+
+// Main send function with fallbacks
 const sendEmail = async (to, subject, html) => {
-    try {
-        console.log(`📧 Sending email to: ${to}`);
+    console.log(`📧 Sending to: ${to}`);
+    
+    // Try providers in order
+    const providers = [
+        { name: 'Brevo', fn: () => sendViaBrevo(to, subject, html), condition: () => process.env.SMTP_BREVO_PASS || (process.env.SMTP_BREVO_HOST?.includes('brevo')) },
+        { name: 'Resend', fn: () => sendViaResend(to, subject, html), condition: () => !!resend },
+        { name: 'Gmail SMTP', fn: () => sendViaGmailSMTP(to, subject, html), condition: () => !!process.env.SMTP_USER },
         
-        if (!to || !subject || !html) {
-            throw new Error('Missing required parameters');
+    ];
+
+    for (const provider of providers) {
+        if (!provider.condition()) continue;
+        
+        try {
+            console.log(`📧 Trying ${provider.name}...`);
+            const result = await provider.fn();
+            console.log(`✅ Email sent via ${provider.name}`);
+            return result;
+        } catch (error) {
+            console.log(`${provider.name} failed:`, error.message);
         }
-
-        // Try Resend first
-        if (resend) {
-            try {
-                return await sendViaResend(to, subject, html);
-            } catch (resendError) {
-                console.log('Resend failed, trying SMTP:', resendError.message);
-            }
-        }
-
-        // Fallback to SMTP with IPv4
-        if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-            return await sendViaSmtp(to, subject, html);
-        }
-
-        throw new Error('No email provider available');
-
-    } catch (error) {
-        console.error('❌ Email failed:', error.message);
-        throw error;
     }
+
+    throw new Error('All email providers failed');
 };
 
 // Export functions
@@ -143,29 +152,13 @@ export const sendTwoFactorOtpEmail = async (to, name, otp, purpose = 'login') =>
     return sendEmail(to, subject, html);
 };
 
-// OTP Template
-const getOtpEmailTemplate = (name, otp) => {
-    return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body { font-family: Arial, sans-serif; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background: #4F46E5; color: white; padding: 20px; text-align: center; }
-                .otp-code { font-size: 32px; font-weight: bold; color: #4F46E5; text-align: center; padding: 20px; letter-spacing: 5px; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>Vingo Password Reset</h1>
-                </div>
-                <div class="otp-code">${otp}</div>
-                <p>Hello ${name},</p>
-                <p>Use this OTP to reset your password. It will expire in 10 minutes.</p>
-            </div>
-        </body>
-        </html>
-    `;
-};
+const getOtpEmailTemplate = (name, otp) => `
+    <div style="font-family: Arial; max-width: 600px; margin: auto; padding: 20px;">
+        <h2 style="color: #4F46E5;">Vingo Password Reset</h2>
+        <p>Hello ${name},</p>
+        <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; letter-spacing: 5px;">
+            <strong>${otp}</strong>
+        </div>
+        <p>This OTP expires in 10 minutes.</p>
+    </div>
+`;
