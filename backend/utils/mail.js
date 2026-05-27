@@ -1,149 +1,73 @@
+// backend/utils/mail.js
 import '../config/env.js';
-import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
-import dns from 'dns';
-import { promisify } from 'util';
-import { getVerificationEmailTemplate, getWelcomeEmailTemplate, getTwoFactorOtpEmailTemplate } from './emailTemplates.js';
+import { 
+    getVerificationEmailTemplate, 
+    getWelcomeEmailTemplate, 
+    getTwoFactorOtpEmailTemplate 
+} from './emailTemplates.js';
 
-const dnsLookup = promisify(dns.lookup);
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const DEFAULT_SENDER = process.env.RESEND_SENDER_EMAIL || 'onboarding@vingo.com';
 const SENDER_NAME = 'Vingo App';
 
-// Cache for SMTP hosts
-let smtpHostIPv4 = null;
+// SMTP Configuration from .env
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === 'true', // false for port 587
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    },
+    tls: {
+        rejectUnauthorized: false
+    },
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000
+});
 
-const getSMTPHostIPv4 = async () => {
-    if (smtpHostIPv4) return smtpHostIPv4;
-    
-    const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-    try {
-        const { address } = await dnsLookup(host, { family: 4 });
-        smtpHostIPv4 = address;
-        console.log(`📧 Resolved ${host} to IPv4: ${address}`);
-        return address;
-    } catch (error) {
-        console.error('DNS resolution failed:', error);
-        return host;
-    }
-};
-
-// Provider 1: Brevo SMTP (Best for Railway)
-const sendViaBrevo = async (to, subject, html) => {
-    const transporter = nodemailer.createTransport({
-        host: 'smtp-relay.brevo.com',
-        port: 587,
-        secure: false,
-        auth: {
-            user: process.env.SMTP_BREVO_USER || process.env.SMTP_USER,
-            pass: process.env.SMTP_BREVO_PASS || process.env.SMTP_BREVO_PASS
-        },
-        connectionTimeout: 10000,
-        socketTimeout: 10000,
-        tls: { rejectUnauthorized: false }
-    });
-
-    const info = await transporter.sendMail({
-        from: `${SENDER_NAME} <${process.env.SMTP_BREVO_USER || process.env.SMTP_USER}>`,
-        to,
-        subject,
-        html
-    });
-
-    return { success: true, provider: 'brevo', messageId: info.messageId };
-};
-
-// Provider 2: Gmail SMTP with IPv4
-const sendViaGmailSMTP = async (to, subject, html) => {
-    const smtpHost = await getSMTPHostIPv4();
-    
-    const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: 465,  // Use 465 instead of 587 for Gmail
-        secure: true,  // SSL
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-        },
-        connectionTimeout: 15000,
-        socketTimeout: 15000,
-        tls: { rejectUnauthorized: false },
-        family: 4
-    });
-
-    const info = await transporter.sendMail({
-        from: `${SENDER_NAME} <${process.env.SMTP_USER}>`,
-        to,
-        subject,
-        html
-    });
-
-    return { success: true, provider: 'gmail', messageId: info.messageId };
-};
-
-// Provider 3: Resend
-const sendViaResend = async (to, subject, html) => {
-    if (!resend) throw new Error('Resend not configured');
-    
-    const result = await resend.emails.send({
-        from: `${SENDER_NAME} <${DEFAULT_SENDER}>`,
-        to: [to],
-        subject,
-        html
-    });
-
-    if (!result?.id) throw new Error('Resend failed');
-    return { success: true, provider: 'resend', messageId: result.id };
-};
-
-
-
-
-
-// Main send function with fallbacks
+// Main email sending function
 const sendEmail = async (to, subject, html) => {
-    console.log(`📧 Sending to: ${to}`);
-    
-    // Try providers in order
-    const providers = [
-        { name: 'Brevo', fn: () => sendViaBrevo(to, subject, html), condition: () => process.env.SMTP_BREVO_PASS || (process.env.SMTP_BREVO_HOST?.includes('brevo')) },
-        { name: 'Resend', fn: () => sendViaResend(to, subject, html), condition: () => !!resend },
-        { name: 'Gmail SMTP', fn: () => sendViaGmailSMTP(to, subject, html), condition: () => !!process.env.SMTP_USER },
+    try {
+        console.log(`📧 Sending email to: ${to}`);
+        console.log(`📧 Subject: ${subject}`);
         
-    ];
-
-    for (const provider of providers) {
-        if (!provider.condition()) continue;
+        const info = await transporter.sendMail({
+            from: `${SENDER_NAME} <${process.env.SMTP_USER}>`,
+            to: to,
+            subject: subject,
+            html: html
+        });
         
-        try {
-            console.log(`📧 Trying ${provider.name}...`);
-            const result = await provider.fn();
-            console.log(`✅ Email sent via ${provider.name}`);
-            return result;
-        } catch (error) {
-            console.log(`${provider.name} failed:`, error.message);
-        }
+        console.log('✅ Email sent successfully!');
+        console.log('📧 Message ID:', info.messageId);
+        return { success: true, messageId: info.messageId };
+        
+    } catch (error) {
+        console.error('❌ Email failed:', error.message);
+        throw error;
     }
-
-    throw new Error('All email providers failed');
 };
 
-// Export functions
-export const sendVerificationEmail = async (to, name, verificationLink) => {
-    const html = getVerificationEmailTemplate(name, verificationLink);
-    return sendEmail(to, 'Verify Your Email Address - Vingo', html);
-};
-
-export const sendWelcomeEmail = async (to, name) => {
-    const html = getWelcomeEmailTemplate(name);
-    return sendEmail(to, 'Welcome to Vingo! 🎉', html);
-};
-
+// OTP Email for Password Reset
 export const sendOtpEmail = async (to, name, otp) => {
     const html = getOtpEmailTemplate(name, otp);
     return sendEmail(to, 'Your OTP for Password Reset - Vingo', html);
 };
 
+// Email Verification
+export const sendVerificationEmail = async (to, name, verificationLink) => {
+    const html = getVerificationEmailTemplate(name, verificationLink);
+    return sendEmail(to, 'Verify Your Email Address - Vingo', html);
+};
+
+// Welcome Email
+export const sendWelcomeEmail = async (to, name) => {
+    const html = getWelcomeEmailTemplate(name);
+    return sendEmail(to, 'Welcome to Vingo! 🎉', html);
+};
+
+// Two Factor OTP Email
 export const sendTwoFactorOtpEmail = async (to, name, otp, purpose = 'login') => {
     const html = getTwoFactorOtpEmailTemplate(name, otp, purpose);
     const subject = purpose === 'login' 
@@ -152,13 +76,40 @@ export const sendTwoFactorOtpEmail = async (to, name, otp, purpose = 'login') =>
     return sendEmail(to, subject, html);
 };
 
+// OTP Email Template (yeh emailTemplates.js mein nahi tha, isliye alag se likh raha hoon)
 const getOtpEmailTemplate = (name, otp) => `
-    <div style="font-family: Arial; max-width: 600px; margin: auto; padding: 20px;">
-        <h2 style="color: #4F46E5;">Vingo Password Reset</h2>
-        <p>Hello ${name},</p>
-        <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; letter-spacing: 5px;">
-            <strong>${otp}</strong>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #4F46E5; color: white; padding: 20px; text-align: center; }
+            .content { padding: 30px; background: #f9fafb; }
+            .otp-box { background-color: #f3f4f6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; }
+            .otp-code { font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #4F46E5; font-family: monospace; }
+            .footer { text-align: center; padding: 20px; font-size: 12px; color: #6b7280; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🔐 Password Reset Request</h1>
+            </div>
+            <div class="content">
+                <h2>Hello ${name},</h2>
+                <p>You requested to reset your password. Use the OTP below to proceed:</p>
+                <div class="otp-box">
+                    <div class="otp-code">${otp}</div>
+                </div>
+                <p><strong>This OTP will expire in 10 minutes.</strong></p>
+                <p>If you didn't request this, please ignore this email.</p>
+                <p>Best regards,<br>Vingo Team</p>
+            </div>
+            <div class="footer">
+                <p>&copy; 2025 Vingo. All rights reserved.</p>
+            </div>
         </div>
-        <p>This OTP expires in 10 minutes.</p>
-    </div>
+    </body>
+    </html>
 `;
