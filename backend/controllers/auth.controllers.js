@@ -4,7 +4,6 @@ import { sendOtpEmail, sendVerificationEmail, sendWelcomeEmail, sendTwoFactorOtp
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { deleteFromCloudinary, uploadToCloudinary } from "../config/cloudinary.js";
-import { emailQueue } from "../utils/emailQueue.js";
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const TWO_FACTOR_CHALLENGE_EXPIRY = "10m";
@@ -113,9 +112,7 @@ export const signUp = async (req, res) => {
         
 
         // Send verification email
-        const verificationLink = `${process.env.FRONTEND_URL}/verify-email/${emailVerificationToken}`;
-        emailQueue.add(sendVerificationEmail, email, fullName, verificationLink)
-        .catch(err => console.error("Queue email failed:", err));
+        const verificationLink = sendVerificationEmail(`${process.env.FRONTEND_URL}/verify-email/${emailVerificationToken}`);
         
         const userResponse = {
             _id: newUser._id,
@@ -178,9 +175,7 @@ export const signIn = async (req, res) => {
                 await user.save();
             }
 
-            const verificationLink = `${process.env.FRONTEND_URL}/verify-email/${user.emailVerificationToken}`;
-            emailQueue.add(sendVerificationEmail, user.email, user.fullName, verificationLink)
-            .catch(err => console.error("Queue email failed:", err));
+           const verificationLink = sendVerificationEmail(`${process.env.FRONTEND_URL}/verify-email/${emailVerificationToken}`);
 
             return res.status(403).json({
                 error: "Email not verified",
@@ -283,8 +278,7 @@ export const sendOtp = async (req, res) => {
         await user.save();
 
 
-        emailQueue.add(sendOtpEmail, email, user.fullName, otp)
-            .catch(err => console.error("Queue email failed:", err));
+       sendOtpEmail(user.email, user.fullName, otp);
 
         return res.status(200).json({
             message: "OTP sent successfully",
@@ -837,8 +831,7 @@ export const verifyEmail = async (req, res) => {
         await user.save();
         
         // Send welcome email
-        emailQueue.add(sendWelcomeEmail, user.email, user.fullName)
-            .catch(err => console.error("Queue email failed:", err));
+        sendWelcomeEmail(user.email, user.fullName);
         
         return res.status(200).json({ 
             message: "Email verified successfully! You can now login." 
@@ -872,8 +865,7 @@ export const resendVerificationEmail = async (req, res) => {
         await user.save();
         
         const verificationLink = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
-        emailQueue.add(sendVerificationEmail, user.email, user.fullName, verificationLink)
-            .catch(err => console.error("Queue email failed:", err));
+        sendVerificationEmail(user.email, user.fullName, verificationLink);
         
         return res.status(200).json({ message: "Verification email sent" });
         
