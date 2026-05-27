@@ -112,8 +112,8 @@ export const signUp = async (req, res) => {
         
 
         // Send verification email
-        const verificationLink = sendVerificationEmail(`${process.env.FRONTEND_URL}/verify-email/${emailVerificationToken}`);
-        
+        const verificationLink = `${process.env.FRONTEND_URL}/verify-email/${emailVerificationToken}`;
+        await sendVerificationEmail(newUser.email, newUser.fullName, verificationLink);
         const userResponse = {
             _id: newUser._id,
             fullName: newUser.fullName,
@@ -175,7 +175,8 @@ export const signIn = async (req, res) => {
                 await user.save();
             }
 
-           const verificationLink = sendVerificationEmail(`${process.env.FRONTEND_URL}/verify-email/${emailVerificationToken}`);
+           const verificationLink = `${process.env.FRONTEND_URL}/verify-email/${user.emailVerificationToken}`;
+           await sendVerificationEmail(user.email, user.fullName, verificationLink);
 
             return res.status(403).json({
                 error: "Email not verified",
@@ -278,7 +279,7 @@ export const sendOtp = async (req, res) => {
         await user.save();
 
 
-       sendOtpEmail(user.email, user.fullName, otp);
+       await sendOtpEmail(user.email, user.fullName, otp);
 
         return res.status(200).json({
             message: "OTP sent successfully",
