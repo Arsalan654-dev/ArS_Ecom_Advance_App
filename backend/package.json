@@ -7,13 +7,14 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon --dns-result-order=ipv4first index.js",
-    "start": "node --dns-result-order=ipv4first index.js"
+    "dev": "nodemon index.js",
+    "start": "nodeindex.js"
   },
   "engines": {
     "node": "24.x"
   },
   "dependencies": {
+    "@getbrevo/brevo": "^5.0.4",
     "@react-oauth/google": "^0.13.5",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",
@@ -27,11 +28,9 @@
     "mailtrap": "^4.6.0",
     "mongoose": "^9.6.2",
     "multer": "^2.1.1",
-    "nodemailer": "^8.0.7",
     "nodemon": "^3.1.14",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "pdfkit": "^0.14.0",
-    "resend": "^6.12.4"
+    "pdfkit": "^0.14.0"
   }
 }
