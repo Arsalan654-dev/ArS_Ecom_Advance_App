@@ -1,47 +1,38 @@
 // backend/utils/mail.js
 import '../config/env.js';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { 
     getVerificationEmailTemplate, 
     getWelcomeEmailTemplate, 
     getTwoFactorOtpEmailTemplate 
 } from './emailTemplates.js';
 
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 const SENDER_NAME = 'Vingo App';
+const SENDER_EMAIL ='onboarding@resend.dev';
 
-// SMTP Configuration from .env
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === 'true', // false for port 587
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-    },
-    tls: {
-        rejectUnauthorized: false
-    },
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 30000
-});
-
-// Main email sending function
+// Main email sending function - HTTP API
 const sendEmail = async (to, subject, html) => {
     try {
         console.log(`📧 Sending email to: ${to}`);
         console.log(`📧 Subject: ${subject}`);
         
-        const info = await transporter.sendMail({
-            from: `${SENDER_NAME} <${process.env.SMTP_USER}>`,
+        const { data, error } = await resend.emails.send({
+            from: `${SENDER_NAME} <${SENDER_EMAIL}>`,
             to: to,
             subject: subject,
             html: html
         });
+
+        if (error) {
+            console.error('❌ Resend API error:', error);
+            throw new Error(error.message);
+        }
         
         console.log('✅ Email sent successfully!');
-        console.log('📧 Message ID:', info.messageId);
-        return { success: true, messageId: info.messageId };
+        console.log('📧 Message ID:', data.id);
+        return { success: true, messageId: data.id };
         
     } catch (error) {
         console.error('❌ Email failed:', error.message);
@@ -76,7 +67,7 @@ export const sendTwoFactorOtpEmail = async (to, name, otp, purpose = 'login') =>
     return sendEmail(to, subject, html);
 };
 
-// OTP Email Template (yeh emailTemplates.js mein nahi tha, isliye alag se likh raha hoon)
+// OTP Email Template
 const getOtpEmailTemplate = (name, otp) => `
     <!DOCTYPE html>
     <html>
