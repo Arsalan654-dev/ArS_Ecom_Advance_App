@@ -52,9 +52,7 @@ const persistAndSendTwoFactorOtp = async (user, purpose) => {
     user.twoFactorLastSentAt = new Date();
 
     await user.save();
-    emailQueue.add(sendTwoFactorOtpEmail, targetEmail, user.fullName, otp, purpose)
-        .catch(err => console.error("Queue email failed:", err));
-
+    await sendTwoFactorOtpEmail(targetEmail, user.fullName, otp, purpose);
     return {
         expiresAt: user.twoFactorOtpExpires,
         email: targetEmail
