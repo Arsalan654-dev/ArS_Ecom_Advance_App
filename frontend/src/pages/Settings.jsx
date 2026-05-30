@@ -33,7 +33,7 @@ const Toggle = ({ checked, onChange, label, desc }) => (
             <div className="font-medium text-gray-900 dark:text-gray-100">{label}</div>
             {desc && <div className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{desc}</div>}
         </div>
-        <div className="relative inline-block w-11 h-6 flex-shrink-0">
+        <div className="relative inline-block w-11 h-6 shrink-0">
             <input type="checkbox" checked={checked} onChange={onChange} className="sr-only peer" />
             <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer-checked:bg-violet-600 transition" />
             <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition ${checked ? 'translate-x-5' : ''}`} />

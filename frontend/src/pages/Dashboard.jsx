@@ -117,7 +117,7 @@ const Dashboard = () => {
 
             {/* Profile card */}
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
-                <div className="h-24 bg-gradient-to-r from-violet-500 to-violet-700" />
+                <div className="h-24 bg-linear-to-r from-violet-500 to-violet-700" />
                 <div className="px-6 pb-6 -mt-12">
                     <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                         <div className="flex items-end gap-4">

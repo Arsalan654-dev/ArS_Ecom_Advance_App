@@ -127,7 +127,7 @@ const AddressBook = () => {
                                         </span>
                                     )}
                                 </div>
-                                <div className="flex gap-1 flex-shrink-0">
+                                <div className="flex gap-1 shrink-0">
                                     <button
                                         onClick={() => { setEditing(addr); setShowForm(true); }}
                                         className="p-2 rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition"

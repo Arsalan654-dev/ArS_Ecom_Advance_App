@@ -42,7 +42,7 @@ const Sidebar = ({ collapsed = false, mobileOpen = false, onMobileClose }) => {
 
     const SidebarBody = (
         <aside
-            className={`bg-gradient-to-b from-violet-600 to-violet-700 dark:from-violet-800 dark:to-violet-900 flex flex-col h-full transition-all duration-200
+            className={`bg-linear-to-b from-violet-600 to-violet-700 dark:from-violet-800 dark:to-violet-900 flex flex-col h-full transition-all duration-200
                 ${collapsed ? 'lg:w-20' : 'lg:w-64'} w-64`}
         >
             {/* Logo */}
@@ -108,7 +108,7 @@ const Sidebar = ({ collapsed = false, mobileOpen = false, onMobileClose }) => {
     return (
         <>
             {/* Desktop */}
-            <div className="hidden lg:block flex-shrink-0">{SidebarBody}</div>
+            <div className="hidden lg:block shrink-0">{SidebarBody}</div>
 
             {/* Mobile drawer */}
             {mobileOpen && (
