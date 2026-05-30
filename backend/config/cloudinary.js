@@ -1,6 +1,7 @@
+// backend\config\cloudinary.js
 import './env.js';
 
-// D:\Vingo\backend\config\cloudinary.js
+
 
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';

@@ -1,4 +1,4 @@
-// D:\Vingo\backend\models\user.model.js
+// backend\models\user.model.js
 
 import mongoose from "mongoose";
 
@@ -105,34 +105,56 @@ const userSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Add pre-hook for cascade delete
-userSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
+
+// ════════════════════════════════════════════════════════════
+// Helper: cascade-delete all addresses for a user
+// ════════════════════════════════════════════════════════════
+async function cascadeDeleteAddresses(userId) {
     try {
-        // Delete all addresses associated with this user
         const Address = mongoose.model('Address');
-        await Address.deleteMany({ user: this._id });
-        console.log(`✅ Deleted all addresses for user: ${this._id}`);
-        next();
-    } catch (error) {
-        console.error("Error deleting user addresses:", error);
-        next(error);
+        const result = await Address.deleteMany({ user: userId });
+        console.log(`✅ [Hook] Cascade-deleted ${result.deletedCount} address(es) for user ${userId}`);
+    } catch (err) {
+        console.error(`❌ [Hook] Cascade delete failed for user ${userId}:`, err);
+        throw err;
     }
+}
+
+// 1. Document middleware (when calling user.deleteOne() on an instance)
+userSchema.pre('deleteOne', { document: true, query: false }, async function () {
+    
+        await cascadeDeleteAddresses(this._id);
+      
+   
 });
 
-// Also handle findOneAndDelete
-userSchema.pre('findOneAndDelete', async function(next) {
-    try {
-        const user = await this.model.findOne(this.getFilter());
-        if (user) {
+// 2. Query middleware (when calling User.deleteOne({ _id: ... }))
+userSchema.pre('deleteOne', { document: false, query: true }, async function () {
+
+        const doc = await this.model.findOne(this.getFilter()).select('_id');
+        if (doc) await cascadeDeleteAddresses(doc._id);
+    
+});
+
+// 3. findOneAndDelete / findByIdAndDelete
+userSchema.pre('findOneAndDelete', async function () {
+    
+        const doc = await this.model.findOne(this.getFilter()).select('_id');
+        if (doc) await cascadeDeleteAddresses(doc._id);
+       
+});
+
+// 4. deleteMany — bulk delete users
+userSchema.pre('deleteMany', async function () {
+  
+        const docs = await this.model.find(this.getFilter()).select('_id');
+        const ids = docs.map(d => d._id);
+        if (ids.length) {
             const Address = mongoose.model('Address');
-            await Address.deleteMany({ user: user._id });
-            console.log(`✅ Deleted all addresses for user: ${user._id}`);
+            const result = await Address.deleteMany({ user: { $in: ids } });
+            console.log(`✅ [Hook] Bulk cascade-deleted ${result.deletedCount} addresses for ${ids.length} users`);
         }
-        next();
-    } catch (error) {
-        console.error("Error deleting user addresses:", error);
-        next(error);
-    }
+    
 });
 
 

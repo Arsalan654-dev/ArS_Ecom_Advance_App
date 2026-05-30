@@ -4,6 +4,7 @@ import { sendOtpEmail, sendVerificationEmail, sendWelcomeEmail, sendTwoFactorOtp
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { deleteFromCloudinary, uploadToCloudinary } from "../config/cloudinary.js";
+import Address from "../models/address.model.js";
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000;
 const TWO_FACTOR_CHALLENGE_EXPIRY = "10m";
@@ -66,36 +67,36 @@ export const signUp = async (req, res) => {
     try {
         const { fullName, email, password, mobile, role } = req.body;
         console.log("📝 User signup attempt:", email);
-        
+
         // Validation
         if (!fullName || !email || !password || !mobile || !role) {
             return res.status(400).json({ error: "All fields are required" });
         }
-        
+
         // Check existing user
         const existingEmail = await User.findOne({ email });
         if (existingEmail) {
             return res.status(400).json({ error: "Email already exists" });
         }
-        
+
         const existingMobile = await User.findOne({ mobile });
         if (existingMobile) {
             return res.status(400).json({ error: "Mobile number already exists" });
         }
-        
+
         if (password.length < 6) {
             return res.status(400).json({ error: "Password must be at least 6 characters" });
         }
-        
+
         if (!/^\d{10,13}$/.test(mobile)) {
             return res.status(400).json({ error: "Mobile number must be 10-13 digits" });
         }
-        
+
         const hashedPassword = await bcrypt.hash(password, 10);
 
-         // Generate email verification token
+        // Generate email verification token
         const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-        
+
         // Create user
         const newUser = await User.create({
             fullName,
@@ -103,11 +104,11 @@ export const signUp = async (req, res) => {
             password: hashedPassword,
             mobile,
             role,
-             isEmailVerified: false,
+            isEmailVerified: false,
             emailVerificationToken: emailVerificationToken,
             emailVerificationExpires: Date.now() + 24 * 60 * 60 * 1000
         });
-        
+
 
         // Send verification email
         const verificationLink = `${process.env.FRONTEND_URL}/verify-email/${emailVerificationToken}`;
@@ -121,21 +122,21 @@ export const signUp = async (req, res) => {
             avatar: newUser.avatar,
             isEmailVerified: false
         };
-        
-        return res.status(201).json({ 
+
+        return res.status(201).json({
             success: true,
-            message: "User registered successfully. Please verify your email to login.", 
+            message: "User registered successfully. Please verify your email to login.",
             user: userResponse,
             requiresEmailVerification: true
         });
-        
+
     } catch (error) {
         console.error("Signup error:", error);
-        
+
         if (error.code === 11000) {
             return res.status(400).json({ error: "Email or mobile already exists" });
         }
-        
+
         res.status(500).json({ error: error.message || "Internal server error" });
     }
 };
@@ -145,9 +146,9 @@ export const signUp = async (req, res) => {
 // Sign in
 export const signIn = async (req, res) => {
     try {
-        
+
         const { email, password } = req.body;
-        
+
         console.log("👤 User signin attempt:", email);
 
         if (!email || !password) {
@@ -158,6 +159,16 @@ export const signIn = async (req, res) => {
 
         if (!user) {
             return res.status(400).json({ error: "Invalid email or password" });
+        }
+
+        // ✨ NEW: Detect Google-only user trying password login
+        if (!user.password && user.googleId) {
+            return res.status(403).json({
+                error: "This account was created with Google. Please sign in with Google, or set a password first.",
+                requiresPasswordSetup: true,
+                email: user.email,
+                message: "You signed up with Google. Set a password to enable email/password login."
+            });
         }
 
         const isMatch = await bcrypt.compare(password, user.password);
@@ -173,8 +184,8 @@ export const signIn = async (req, res) => {
                 await user.save();
             }
 
-           const verificationLink = `${process.env.FRONTEND_URL}/verify-email/${user.emailVerificationToken}`;
-           await sendVerificationEmail(user.email, user.fullName, verificationLink);
+            const verificationLink = `${process.env.FRONTEND_URL}/verify-email/${user.emailVerificationToken}`;
+            await sendVerificationEmail(user.email, user.fullName, verificationLink);
 
             return res.status(403).json({
                 error: "Email not verified",
@@ -205,7 +216,7 @@ export const signIn = async (req, res) => {
                 expiresAt: challenge.expiresAt
             });
         }
-        
+
         const token = buildAuthToken(user._id.toString());
 
         res.cookie("token", token, {
@@ -244,9 +255,9 @@ export const signOut = async (req, res) => {
             secure: process.env.NODE_ENV === "production",
             sameSite: "strict"
         });
-        return res.status(200).json({ 
+        return res.status(200).json({
             success: true,
-            message: "User logged out successfully" 
+            message: "User logged out successfully"
         });
     } catch (error) {
         console.error("Signout error:", error);
@@ -277,7 +288,7 @@ export const sendOtp = async (req, res) => {
         await user.save();
 
 
-       await sendOtpEmail(user.email, user.fullName, otp);
+        await sendOtpEmail(user.email, user.fullName, otp);
 
         return res.status(200).json({
             message: "OTP sent successfully",
@@ -645,7 +656,7 @@ export const resendTwoFactorLoginOtp = async (req, res) => {
 // ============= GOOGLE LOGIN - WORKING VERSION =============
 export const googleLogin = async (req, res) => {
     try {
-        
+
         const { email, name, picture, googleId, avatar } = req.body;
         console.log("🔐 Google login attempt:", email);
 
@@ -758,34 +769,34 @@ export const updateProfile = async (req, res) => {
     try {
         const userId = req.userId;
         const { fullName, mobile, role } = req.body;
-        
+
         const updateData = {};
         if (fullName) updateData.fullName = fullName;
         if (mobile) updateData.mobile = mobile;
         if (role && ['user', 'owner', 'deliveryBoy'].includes(role)) updateData.role = role;
-        
+
         const updatedUser = await User.findByIdAndUpdate(
             userId,
             updateData,
             { new: true, runValidators: true }
         ).select('-password -resetOtp -otpExpires');
-        
+
         if (!updatedUser) {
             return res.status(404).json({ error: "User not found" });
         }
-        
-        return res.status(200).json({ 
-            message: "Profile updated successfully", 
-            user: updatedUser 
+
+        return res.status(200).json({
+            message: "Profile updated successfully",
+            user: updatedUser
         });
-        
+
     } catch (error) {
         console.error("Update profile error:", error);
-        
+
         if (error.code === 11000) {
             return res.status(400).json({ error: "Mobile number already exists" });
         }
-        
+
         res.status(500).json({ error: "Failed to update profile" });
     }
 };
@@ -797,12 +808,18 @@ export const getProfile = async (req, res) => {
     try {
         const userId = req.userId;
         const user = await User.findById(userId).select("-password -resetOtp -otpExpires");
-        
+
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
-        
-        return res.status(200).json({ user });
+        const userObj = user.toObject();
+        userObj.hasPassword = !!user.password;        // ✨ NEW: tells frontend whether to show Set vs Change
+        delete userObj.password;                      // never leak password hash
+        delete userObj.resetOtp;
+        delete userObj.twoFactorOtp;
+        delete userObj.emailVerificationToken;
+
+        return res.status(200).json({ user: userObj });
     } catch (error) {
         console.error("Get profile error:", error);
         res.status(500).json({ error: "Internal server error" });
@@ -814,28 +831,28 @@ export const getProfile = async (req, res) => {
 export const verifyEmail = async (req, res) => {
     try {
         const { token } = req.params;
-        
+
         const user = await User.findOne({
             emailVerificationToken: token,
             emailVerificationExpires: { $gt: Date.now() }
         });
-        
+
         if (!user) {
             return res.status(400).json({ error: "Invalid or expired verification token" });
         }
-        
+
         user.isEmailVerified = true;
         user.emailVerificationToken = null;
         user.emailVerificationExpires = null;
         await user.save();
-        
+
         // Send welcome email
         sendWelcomeEmail(user.email, user.fullName);
-        
-        return res.status(200).json({ 
-            message: "Email verified successfully! You can now login." 
+
+        return res.status(200).json({
+            message: "Email verified successfully! You can now login."
         });
-        
+
     } catch (error) {
         console.error("Email verification error:", error);
         res.status(500).json({ error: "Email verification failed" });
@@ -847,27 +864,27 @@ export const verifyEmail = async (req, res) => {
 export const resendVerificationEmail = async (req, res) => {
     try {
         const { email } = req.body;
-        
+
         const user = await User.findOne({ email });
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
-        
+
         if (user.isEmailVerified) {
             return res.status(400).json({ error: "Email already verified" });
         }
-        
+
         // Generate new token
         const verificationToken = crypto.randomBytes(32).toString('hex');
         user.emailVerificationToken = verificationToken;
         user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
         await user.save();
-        
+
         const verificationLink = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
         sendVerificationEmail(user.email, user.fullName, verificationLink);
-        
+
         return res.status(200).json({ message: "Verification email sent" });
-        
+
     } catch (error) {
         console.error("Resend verification error:", error);
         res.status(500).json({ error: "Failed to send verification email" });
@@ -881,34 +898,34 @@ export const changePassword = async (req, res) => {
     try {
         const userId = req.userId;
         const { currentPassword, newPassword } = req.body;
-        
+
         if (!currentPassword || !newPassword) {
             return res.status(400).json({ error: "Current password and new password are required" });
         }
-        
+
         if (newPassword.length < 6) {
             return res.status(400).json({ error: "New password must be at least 6 characters" });
         }
-        
+
         const user = await User.findById(userId);
-        
+
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
-        
+
         // Verify current password
         const isMatch = await bcrypt.compare(currentPassword, user.password);
         if (!isMatch) {
             return res.status(400).json({ error: "Current password is incorrect" });
         }
-        
+
         // Hash new password
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         user.password = hashedPassword;
         await user.save();
-        
+
         return res.status(200).json({ message: "Password changed successfully" });
-        
+
     } catch (error) {
         console.error("Change password error:", error);
         res.status(500).json({ error: "Failed to change password" });
@@ -919,87 +936,127 @@ export const changePassword = async (req, res) => {
 export const uploadProfilePicture = async (req, res) => {
     try {
         const userId = req.userId;
-        
+
         if (!req.file) {
             return res.status(400).json({ error: "No file uploaded" });
         }
-        
+
         const user = await User.findById(userId);
-        
+
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
-        
+
         // Delete old avatar from Cloudinary if exists
         if (user.avatarPublicId) {
             await deleteFromCloudinary(user.avatarPublicId);
         }
-        
+
         // Upload new image to Cloudinary
         const result = await uploadToCloudinary(req.file.buffer, 'vingo/users');
-        
+
         // Update user with new avatar info
         user.avatar = result.secure_url;
         user.avatarPublicId = result.public_id;
         await user.save();
-        
+
         return res.status(200).json({
             success: true,
             message: "Profile picture updated successfully",
             avatar: user.avatar
         });
-        
+
     } catch (error) {
         console.error("Upload profile picture error:", error);
-        res.status(500).json({ 
+        res.status(500).json({
             error: "Failed to upload profile picture",
-            details: error.message 
+            details: error.message
         });
     }
 };
 
 // Delete User Account
+// Add this import at the top of auth.controllers.js if not already there:
+// import Address from "../models/address.model.js";
+
 export const deleteAccount = async (req, res) => {
     try {
         const userId = req.userId;
-        const { password } = req.body;
-
-        if (!password) {
-            return res.status(400).json({ error: "Password is required to delete account" });
-        }
+        const { password, confirmation } = req.body;
 
         const user = await User.findById(userId);
-
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ error: "Password is incorrect" });
+
+        // ═══ Branch 1: Google-only user (no password set) ═══
+        if (!user.password) {
+            // Require typed confirmation as safety check
+            if (!confirmation || String(confirmation).trim().toUpperCase() !== 'DELETE') {
+                return res.status(400).json({
+                    error: "Please type DELETE to confirm account deletion",
+                    requiresTypedConfirmation: true
+                });
+            }
+            console.log(`🗑️  Deleting Google-only user (confirmation match): ${user._id}`);
         }
 
-        console.log(`🗑️ Deleting user account: ${user._id}`);
+        else {
+            if (!password) {
+                return res.status(400).json({ error: "Password is required to delete account" });
+            }
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                return res.status(400).json({ error: "Password is incorrect" });
+            }
+            console.log(`🗑️  Deleting user (password verified): ${user._id}`);
+        }
 
+        // ✅ EXPLICIT CASCADE DELETE — most reliable, no Mongoose magic
+        // 1. Delete all addresses belonging to this user
+        const addressResult = await Address.deleteMany({ user: userId });
+        console.log(`✅ Deleted ${addressResult.deletedCount} address(es) for user ${userId}`);
+
+        // 2. (Optional) Delete avatar from Cloudinary if exists
+        if (user.avatarPublicId) {
+            try {
+                const { v2: cloudinary } = await import('cloudinary');
+                await cloudinary.uploader.destroy(user.avatarPublicId);
+                console.log(`✅ Deleted avatar from Cloudinary: ${user.avatarPublicId}`);
+            } catch (cloudErr) {
+                console.warn("⚠️  Could not delete Cloudinary avatar:", cloudErr.message);
+                // Don't fail the whole deletion if Cloudinary fails
+            }
+        }
+
+        // 3. Finally delete the user document
         await User.deleteOne({ _id: userId });
 
-        console.log(`✅ User account deleted successfully: ${userId}`);
+        console.log(`✅ User account fully deleted: ${userId}`);
 
-        res.clearCookie("token");
+        // Clear auth cookie
+        res.clearCookie("token", {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+        });
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             success: true,
-            message: "Account deleted successfully. All associated data has been removed." 
+            message: "Account and all associated data deleted successfully.",
+            deletedAddresses: addressResult.deletedCount
         });
 
     } catch (error) {
         console.error("Delete account error:", error);
-        res.status(500).json({ 
-            error: "Failed to delete account",
-            details: error.message 
+        return res.status(500).json({
+            error: "Failed to delete account. Please try again.",
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
     }
 };
+
 
 // Download Profile as PDF
 export const downloadProfilePDF = async (req, res) => {
@@ -1012,18 +1069,175 @@ export const downloadProfilePDF = async (req, res) => {
         }
 
         const { generateUserProfilePDF } = await import('../utils/pdfGenerator.js');
-        
         const pdfBuffer = await generateUserProfilePDF(user, user.addresses || []);
 
-        res.contentType('application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="Vingo_Profile_${user.fullName.replace(/\s+/g, '_')}_${Date.now()}.pdf"`);
-        res.send(pdfBuffer);
+        // ✅ Validate buffer
+        if (!pdfBuffer || pdfBuffer.length === 0) {
+            return res.status(500).json({ error: "PDF generation produced empty file" });
+        }
+
+        const safeName = (user.fullName || 'User').replace(/[^a-zA-Z0-9]/g, '_');
+        const fileName = `Vingo_Profile_${safeName}_${Date.now()}.pdf`;
+
+        // ✅ Set ALL headers BEFORE sending body
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
+        // ✅ Send as binary
+        return res.end(pdfBuffer, 'binary');
 
     } catch (error) {
         console.error("Download PDF error:", error);
-        res.status(500).json({ 
-            error: "Failed to generate PDF",
-            details: error.message 
-        });
+        // Only send JSON error if headers not already sent
+        if (!res.headersSent) {
+            return res.status(500).json({
+                error: "Failed to generate PDF. Please try again.",
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
     }
 };
+
+
+// ════════════════════════════════════════════════════════════
+// SET PASSWORD — for logged-in users who don't have one yet (Google users)
+// ════════════════════════════════════════════════════════════
+export const setPasswordLoggedIn = async (req, res) => {
+    try {
+        const userId = req.userId;
+        const { newPassword } = req.body;
+
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ error: "Password must be at least 6 characters" });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        if (user.password) {
+            return res.status(400).json({
+                error: "You already have a password. Use 'Change Password' instead."
+            });
+        }
+
+        const hashed = await bcrypt.hash(newPassword, 10);
+        user.password = hashed;
+        await user.save();
+
+        console.log(`✅ Password set for Google user: ${user.email}`);
+
+        return res.status(200).json({
+            success: true,
+            message: "Password set successfully. You can now log in with email and password."
+        });
+    } catch (error) {
+        console.error("Set password error:", error);
+        return res.status(500).json({ error: "Failed to set password" });
+    }
+};
+
+// ════════════════════════════════════════════════════════════
+// REQUEST OTP for unauthenticated password setup
+// (User tried email/password login as a Google user)
+// ════════════════════════════════════════════════════════════
+export const requestPasswordSetupOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ error: "Email is required" });
+
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) return res.status(404).json({ error: "Account not found" });
+
+        // Only Google-only users (no password) can use this
+        if (user.password) {
+            return res.status(400).json({
+                error: "You already have a password. Use 'Forgot Password' to reset it."
+            });
+        }
+        if (!user.googleId) {
+            return res.status(400).json({ error: "This flow is only for Google accounts." });
+        }
+
+        // Generate 6-digit OTP, 10-minute validity
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+        user.resetOtp = otp;
+        user.otpExpires = expiresAt;
+        user.isOtpVerified = false;
+        await user.save();
+
+        // Send email — reuse your existing email sender. Adapt the import to your setup.
+        try {
+
+            await sendOtpEmail(user.email, otp, "Set Your Vingo Password");
+        } catch (mailErr) {
+            console.error("OTP email send failed:", mailErr);
+            return res.status(500).json({ error: "Could not send verification email" });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Verification code sent to your email",
+            email: user.email,
+            expiresAt
+        });
+    } catch (error) {
+        console.error("Request password setup OTP error:", error);
+        return res.status(500).json({ error: "Failed to send verification code" });
+    }
+};
+
+// ════════════════════════════════════════════════════════════
+// VERIFY OTP + SET PASSWORD (unauthenticated)
+// ════════════════════════════════════════════════════════════
+export const verifyPasswordSetupAndSet = async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+
+        if (!email || !otp || !newPassword) {
+            return res.status(400).json({ error: "Email, OTP and new password are required" });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: "Password must be at least 6 characters" });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) return res.status(404).json({ error: "Account not found" });
+
+        if (user.password) {
+            return res.status(400).json({ error: "Password already set. Please sign in." });
+        }
+        if (!user.resetOtp || !user.otpExpires) {
+            return res.status(400).json({ error: "No OTP found. Please request a new one." });
+        }
+        if (user.resetOtp !== otp) {
+            return res.status(400).json({ error: "Invalid OTP" });
+        }
+        if (user.otpExpires.getTime() < Date.now()) {
+            return res.status(400).json({ error: "OTP has expired. Please request a new one.", expired: true });
+        }
+
+        const hashed = await bcrypt.hash(newPassword, 10);
+        user.password = hashed;
+        user.resetOtp = null;
+        user.otpExpires = null;
+        user.isOtpVerified = true;
+        await user.save();
+
+        console.log(`✅ Password set via OTP for Google user: ${user.email}`);
+
+        return res.status(200).json({
+            success: true,
+            message: "Password set successfully! You can now log in with email and password."
+        });
+    } catch (error) {
+        console.error("Verify & set password error:", error);
+        return res.status(500).json({ error: "Failed to set password" });
+    }
+};
+

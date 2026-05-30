@@ -1,3 +1,5 @@
+// backend\config\db.js
+
 import './env.js';
 import mongoose from "mongoose";
 

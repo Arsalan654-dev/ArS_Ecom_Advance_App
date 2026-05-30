@@ -1,3 +1,5 @@
+// backend\routes\auth.routes.js
+
 import express from 'express';
 import { upload } from '../config/cloudinary.js';
 import { 
@@ -21,7 +23,10 @@ import {
     verifyTwoFactorLogin,
     resendTwoFactorLoginOtp,
     deleteAccount,
-    downloadProfilePDF } from '../controllers/auth.controllers.js';
+    downloadProfilePDF, 
+    requestPasswordSetupOtp,
+    verifyPasswordSetupAndSet,
+    setPasswordLoggedIn} from '../controllers/auth.controllers.js';
 import { verifyToken } from '../middleware/auth.middleware.js';
 
 
@@ -47,6 +52,10 @@ authRouter.get('/profile', verifyToken, getProfile);
 
 authRouter.put('/profile', verifyToken, updateProfile);
 
+authRouter.post('/set-password/request-otp', requestPasswordSetupOtp);
+authRouter.post('/set-password/verify', verifyPasswordSetupAndSet);
+
+authRouter.post('/set-password', verifyToken, setPasswordLoggedIn);
 authRouter.post('/change-password', verifyToken, changePassword);
 authRouter.post('/upload-avatar', verifyToken, upload.single('avatar'), uploadProfilePicture);
 authRouter.delete('/delete-account', verifyToken, deleteAccount);

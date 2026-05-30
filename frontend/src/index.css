@@ -1,1 +1,63 @@
+/* frontend/src/index.css */
+
 @import "tailwindcss";
+
+/* ✅ Tailwind v4 dark mode based on .dark class on <html> */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+    --vingo-purple: #8B5CF6;
+    --vingo-purple-dark: #7C3AED;
+    --vingo-purple-light: #A78BFA;
+    --vingo-purple-50: #F5F3FF;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    @apply bg-gray-50 text-gray-900 transition-colors duration-200;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+html.dark body {
+    @apply bg-gray-950 text-gray-100;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+html.dark ::-webkit-scrollbar-thumb { background: #475569; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Smooth transitions on theme switch */
+* {
+    transition-property: background-color, border-color, color;
+    transition-duration: 150ms;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+
+@keyframes shimmer {
+    0%   { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
+}
+.skeleton {
+    background: linear-gradient(90deg, #f1f5f9 0%, #e2e8f0 50%, #f1f5f9 100%);
+    background-size: 1000px 100%;
+    animation: shimmer 1.5s infinite;
+}
+html.dark .skeleton {
+    background: linear-gradient(90deg, #1e293b 0%, #334155 50%, #1e293b 100%);
+    background-size: 1000px 100%;
+}

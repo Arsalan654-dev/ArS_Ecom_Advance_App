@@ -1,4 +1,4 @@
-// D:\Vingo\frontend\src\components\FreeMapPicker.jsx - Updated version
+/* frontend/src/components/FreeMapPicker.jsx */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';

@@ -1,4 +1,4 @@
-// Verify JWT token middleware
+// backend/middleware/auth.middleware.js
 import jwt from 'jsonwebtoken';
 
 export const verifyToken = async (req, res, next) => {

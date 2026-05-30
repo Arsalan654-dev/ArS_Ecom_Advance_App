@@ -1,3 +1,5 @@
+// backend\utils\token.js
+
 import jwt from "jsonwebtoken";
 
 export const genToken = async (userId) => {

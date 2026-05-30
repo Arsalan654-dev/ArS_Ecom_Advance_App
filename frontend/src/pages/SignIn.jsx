@@ -1,3 +1,5 @@
+/* frontend/src/pages/SignIn.jsx */
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { FaRegEye, FaRegEyeSlash } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,329 +9,221 @@ import GoogleLogin from '../components/GoogleLogin';
 import API_URL from '../config/api';
 
 const OTP_RESEND_SECONDS = 60;
-
-const formatSeconds = (seconds) => `${String(Math.max(0, seconds)).padStart(2, '0')}s`;
+const fmt = s => `${String(Math.max(0, s)).padStart(2, '0')}s`;
 
 const SignIn = () => {
-    const [showPassword, setShowPassword] = useState(false);
+    const navigate = useNavigate();
+    const [showPwd, setShowPwd] = useState(false);
     const [step, setStep] = useState('credentials');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [twoFactorOtp, setTwoFactorOtp] = useState('');
+    const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
-    const [emailNotVerifiedMessage, setEmailNotVerifiedMessage] = useState('');
+    const [unverifiedMsg, setUnverifiedMsg] = useState('');
     const [errors, setErrors] = useState({});
-    const [twoFactorState, setTwoFactorState] = useState({
-        challengeToken: '',
-        email: '',
-        expiresAt: null,
-        resendAt: null,
-        resendSecondsLeft: OTP_RESEND_SECONDS
+
+    const [tfState, setTfState] = useState({
+        challengeToken: '', email: '', expiresAt: null,
+        resendAt: null, resendSecondsLeft: OTP_RESEND_SECONDS
     });
 
-    const navigate = useNavigate();
-
     useEffect(() => {
-        if (step !== 'two-factor') {
-            return undefined;
-        }
-
-        const timer = setInterval(() => {
-            setTwoFactorState((current) => {
-                if (!current.resendAt) {
-                    return current;
-                }
-
-                const secondsLeft = Math.max(
-                    0,
-                    Math.ceil((new Date(current.resendAt).getTime() - Date.now()) / 1000)
-                );
-
-                return {
-                    ...current,
-                    resendSecondsLeft: secondsLeft
-                };
+        if (step !== 'two-factor') return;
+        const id = setInterval(() => {
+            setTfState(cur => {
+                if (!cur.resendAt) return cur;
+                const left = Math.max(0, Math.ceil((new Date(cur.resendAt).getTime() - Date.now()) / 1000));
+                return { ...cur, resendSecondsLeft: left };
             });
         }, 1000);
-
-        return () => clearInterval(timer);
+        return () => clearInterval(id);
     }, [step]);
 
-    const isResendDisabled = useMemo(() => twoFactorState.resendSecondsLeft > 0, [twoFactorState.resendSecondsLeft]);
+    const resendDisabled = useMemo(() => tfState.resendSecondsLeft > 0, [tfState.resendSecondsLeft]);
 
-    const validateCredentials = () => {
-        const newErrors = {};
-        if (!email) {
-            newErrors.email = 'Email is required';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            newErrors.email = 'Please enter a valid email address';
-        }
-        if (!password) {
-            newErrors.password = 'Password is required';
-        }
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const validate = () => {
+        const e = {};
+        if (!email) e.email = 'Email is required';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Invalid email';
+        if (!password) e.password = 'Password is required';
+        setErrors(e);
+        return !Object.keys(e).length;
     };
 
-    const storeSession = (responseData) => {
-        if (responseData?.token) {
-            localStorage.setItem('token', responseData.token);
-            localStorage.setItem('user', JSON.stringify(responseData.user));
+    const persist = (data) => {
+        if (data?.token) {
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('user', JSON.stringify(data.user));
         }
     };
 
-    const handleCredentialsSubmit = async () => {
-        if (!validateCredentials()) return;
-
-        setLoading(true);
-        setEmailNotVerifiedMessage('');
-
+    // ✅ Form onSubmit — triggered by Enter key OR button click
+    const submitCreds = async (e) => {
+        if (e?.preventDefault) e.preventDefault();
+        if (!validate()) return;
+        setLoading(true); setUnverifiedMsg('');
         try {
-            const response = await axios.post(
-                `${API_URL}/api/auth/signin`,
-                { email, password },
-                { withCredentials: true }
-            );
+            const res = await axios.post(`${API_URL}/api/auth/signin`, { email, password }, { withCredentials: true });
 
-            if (response.data.twoFactorRequired) {
-                setTwoFactorState({
-                    challengeToken: response.data.challengeToken,
-                    email: response.data.email || '',
-                    expiresAt: response.data.expiresAt || null,
-                    resendAt: response.data.expiresAt || null,
+            if (res.data.twoFactorRequired) {
+                setTfState({
+                    challengeToken: res.data.challengeToken,
+                    email: res.data.email || '',
+                    expiresAt: res.data.expiresAt || null,
+                    resendAt: res.data.expiresAt || null,
                     resendSecondsLeft: OTP_RESEND_SECONDS
                 });
-                setStep('two-factor');
-                setTwoFactorOtp('');
-                toast.info(response.data.message || 'Verification code sent to your email');
+                setStep('two-factor'); setOtp('');
+                toast.info(res.data.message || 'Verification code sent to your email');
                 return;
             }
-
-            storeSession(response.data);
+            persist(res.data);
             toast.success('Login successful!');
             navigate('/dashboard');
-        } catch (error) {
-            console.error('Signin Error:', error);
-
-            if (error.response?.status === 403 && error.response?.data?.requiresEmailVerification) {
-                setEmailNotVerifiedMessage(error.response.data.message || 'Email verification required');
-                toast.warning(error.response.data.message || 'Email verification required');
-            } else {
-                const errorMsg = error.response?.data?.error || 'Signin failed';
-                toast.error(errorMsg);
+        } catch (err) {
+            // ✨ NEW: Google user trying password login
+            if (err.response?.status === 403 && err.response?.data?.requiresPasswordSetup) {
+                toast.warning(err.response.data.message || 'Set a password to enable email login.');
+                navigate('/set-password', { state: { email: err.response.data.email || email } });
+                return;
             }
-        } finally {
-            setLoading(false);
-        }
+            if (err.response?.status === 403 && err.response?.data?.requiresEmailVerification) {
+                setUnverifiedMsg(err.response.data.message || 'Email verification required');
+                toast.warning(err.response.data.message || 'Email verification required');
+            } else {
+                toast.error(err.response?.data?.error || 'Signin failed');
+            }
+        } finally { setLoading(false); }
     };
 
-    const handleTwoFactorVerify = async () => {
-        if (!twoFactorOtp || twoFactorOtp.length !== 6) {
-            toast.error('Please enter a valid 6-digit code');
-            return;
-        }
-
+    const submitOtp = async (e) => {
+        if (e?.preventDefault) e.preventDefault();
+        if (otp.length !== 6) return toast.error('Enter the 6-digit code');
         setLoading(true);
         try {
-            const response = await axios.post(
-                `${API_URL}/api/auth/two-factor/login/verify`,
-                {
-                    challengeToken: twoFactorState.challengeToken,
-                    otp: twoFactorOtp
-                },
-                { withCredentials: true }
-            );
-
-            storeSession(response.data);
+            const res = await axios.post(`${API_URL}/api/auth/two-factor/login/verify`, {
+                challengeToken: tfState.challengeToken, otp
+            }, { withCredentials: true });
+            persist(res.data);
             toast.success('Login successful!');
             navigate('/dashboard');
-        } catch (error) {
-            console.error('Two-factor verify error:', error);
-            const errorMsg = error.response?.data?.error || 'Invalid code';
-            if (error.response?.data?.expired) {
-                toast.warning(errorMsg);
-            } else {
-                toast.error(errorMsg);
-            }
-        } finally {
-            setLoading(false);
-        }
+        } catch (err) {
+            const msg = err.response?.data?.error || 'Invalid code';
+            err.response?.data?.expired ? toast.warning(msg) : toast.error(msg);
+        } finally { setLoading(false); }
     };
 
-    const handleResendTwoFactor = async () => {
-        if (isResendDisabled) {
-            toast.info(`Please wait ${formatSeconds(twoFactorState.resendSecondsLeft)} before resending`);
-            return;
-        }
-
+    const resend = async () => {
+        if (resendDisabled) return toast.info(`Wait ${fmt(tfState.resendSecondsLeft)} before resending`);
         setLoading(true);
         try {
-            const response = await axios.post(
-                `${API_URL}/api/auth/two-factor/login/resend`,
-                { challengeToken: twoFactorState.challengeToken },
-                { withCredentials: true }
-            );
-
-            setTwoFactorState((current) => ({
-                ...current,
-                email: response.data.email || current.email,
-                expiresAt: response.data.expiresAt || current.expiresAt,
-                resendAt: response.data.expiresAt || new Date(Date.now() + OTP_RESEND_SECONDS * 1000),
+            const res = await axios.post(`${API_URL}/api/auth/two-factor/login/resend`, {
+                challengeToken: tfState.challengeToken
+            }, { withCredentials: true });
+            setTfState(cur => ({
+                ...cur,
+                email: res.data.email || cur.email,
+                expiresAt: res.data.expiresAt || cur.expiresAt,
+                resendAt: res.data.expiresAt || new Date(Date.now() + OTP_RESEND_SECONDS * 1000),
                 resendSecondsLeft: OTP_RESEND_SECONDS
             }));
-            toast.success('New verification code sent');
-        } catch (error) {
-            console.error('Two-factor resend error:', error);
-            toast.error(error.response?.data?.error || 'Failed to resend code');
-        } finally {
-            setLoading(false);
-        }
+            toast.success('New code sent');
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'Failed to resend');
+        } finally { setLoading(false); }
     };
 
-    const renderCredentialsStep = () => (
-        <>
-            <div className='mt-6'>
-                <label className='block text-gray-700'>Email</label>
-                <input
-                    type='email'
-                    className={`w-full mt-2 p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
-                    placeholder='Enter your email'
-                    value={email}
-                    onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (errors.email) setErrors({ ...errors, email: '' });
-                    }}
-                    disabled={loading}
-                />
-                {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
-            </div>
-
-            <div className='mt-6'>
-                <label className='block text-gray-700'>Password</label>
-                <div className='relative'>
-                    <input
-                        type={showPassword ? 'text' : 'password'}
-                        className={`w-full mt-2 p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
-                        placeholder='Enter your password'
-                        value={password}
-                        onChange={(e) => {
-                            setPassword(e.target.value);
-                            if (errors.password) setErrors({ ...errors, password: '' });
-                        }}
-                        disabled={loading}
-                    />
-                    <button
-                        type='button'
-                        className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600'
-                        onClick={() => setShowPassword(!showPassword)}
-                    >
-                        {!showPassword ? <FaRegEye /> : <FaRegEyeSlash />}
-                    </button>
-                </div>
-                {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
-            </div>
-
-            <div className='mt-4 flex justify-end'>
-                <Link to='/forgot-password' className='text-indigo-600 hover:text-indigo-800'>
-                    Forgot password?
-                </Link>
-            </div>
-
-            <button
-                className='w-full mt-6 p-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50'
-                onClick={handleCredentialsSubmit}
-                disabled={loading}
-            >
-                {loading ? 'Signing in...' : 'Sign In'}
-            </button>
-
-            <p className='text-gray-600 text-center mt-4'>
-                Don't have an account?{' '}
-                <Link to='/signup' className='text-indigo-600 hover:text-indigo-800'>
-                    Sign Up
-                </Link>
-            </p>
-
-            <div className='mt-4'>
-                <GoogleLogin />
-            </div>
-        </>
-    );
-
-    const renderTwoFactorStep = () => (
-        <>
-            <div className='mt-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4'>
-                <p className='text-sm text-indigo-800 font-medium'>✅ Two-step verification enabled</p>
-                <p className='text-sm text-indigo-700 mt-1'>
-                    We sent a 6-digit code to your email {twoFactorState.email ? `(${twoFactorState.email})` : ''}.
-                </p>
-                {twoFactorState.expiresAt && (
-                    <p className='text-xs text-indigo-600 mt-2'>
-                        Code expires at {new Date(twoFactorState.expiresAt).toLocaleTimeString()}
-                    </p>
-                )}
-            </div>
-
-            <div className='mt-6'>
-                <label className='block text-gray-700'>Verification Code</label>
-                <input
-                    type='text'
-                    inputMode='numeric'
-                    maxLength={6}
-                    className='w-full mt-2 p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 tracking-[0.3em] text-center text-lg'
-                    placeholder='______'
-                    value={twoFactorOtp}
-                    onChange={(e) => setTwoFactorOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    disabled={loading}
-                />
-            </div>
-
-            <div className='mt-4 flex items-center justify-between text-sm'>
-                <button
-                    type='button'
-                    onClick={handleResendTwoFactor}
-                    disabled={loading || isResendDisabled}
-                    className='text-indigo-600 hover:text-indigo-800 disabled:text-gray-400'
-                >
-                    {isResendDisabled ? `Resend in ${formatSeconds(twoFactorState.resendSecondsLeft)}` : 'Resend code'}
-                </button>
-
-                <button
-                    type='button'
-                    onClick={() => {
-                        setStep('credentials');
-                        setTwoFactorOtp('');
-                    }}
-                    className='text-gray-600 hover:text-gray-800'
-                    disabled={loading}
-                >
-                    Back
-                </button>
-            </div>
-
-            <button
-                className='w-full mt-6 p-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50'
-                onClick={handleTwoFactorVerify}
-                disabled={loading}
-            >
-                {loading ? 'Verifying...' : 'Verify and Continue'}
-            </button>
-        </>
-    );
-
     return (
-        <div className='min-h-screen flex items-center justify-center p-4 bg-gray-200'>
-            <div className='w-full max-w-md bg-white rounded-xl shadow-lg p-8'>
-                <h1 className='text-3xl font-bold text-center text-indigo-600'>Vingo</h1>
-                <p className='text-gray-600 text-center mt-4'>Sign in to your account</p>
+        <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-950">
+            <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8 border border-gray-200 dark:border-gray-800">
+                <div className="text-center">
+                    <h1 className="text-3xl font-bold text-violet-600">Vingo</h1>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2">Sign in to your account</p>
+                </div>
 
-                {emailNotVerifiedMessage && (
-                    <div className='mt-4 rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800'>
-                        {emailNotVerifiedMessage}
+                {unverifiedMsg && (
+                    <div className="mt-5 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-300">
+                        {unverifiedMsg}
                     </div>
                 )}
 
-                {step === 'credentials' ? renderCredentialsStep() : renderTwoFactorStep()}
+                {step === 'credentials' ? (
+                    // ✅ Wrap in <form> so Enter key submits
+                    <form onSubmit={submitCreds} noValidate>
+                        <div className="mt-6">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+                            <input
+                                type="email" value={email}
+                                onChange={e => { setEmail(e.target.value); errors.email && setErrors({ ...errors, email: '' }); }}
+                                placeholder="[email protected]"
+                                disabled={loading}
+                                autoComplete="email"
+                                className={`mt-1 w-full p-3 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 ${errors.email ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'}`}
+                            />
+                            {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
+                        </div>
+                        <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+                            <div className="relative">
+                                <input
+                                    type={showPwd ? 'text' : 'password'} value={password}
+                                    onChange={e => { setPassword(e.target.value); errors.password && setErrors({ ...errors, password: '' }); }}
+                                    placeholder="••••••••"
+                                    disabled={loading}
+                                    autoComplete="current-password"
+                                    className={`mt-1 w-full p-3 pr-10 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 ${errors.password ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'}`}
+                                />
+                                <button type="button" onClick={() => setShowPwd(!showPwd)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" tabIndex={-1}>
+                                    {showPwd ? <FaRegEyeSlash /> : <FaRegEye />}
+                                </button>
+                            </div>
+                            {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password}</p>}
+                        </div>
+                        <div className="mt-2 flex justify-end">
+                            <Link to="/forgot-password" className="text-sm text-violet-600 hover:text-violet-700">Forgot password?</Link>
+                        </div>
+                        <button
+                            type="submit" disabled={loading}
+                            className="w-full mt-5 p-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg disabled:opacity-50 transition"
+                        >{loading ? 'Signing in…' : 'Sign In'}</button>
+
+                        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
+                            Don't have an account? <Link to="/signup" className="text-violet-600 hover:text-violet-700 font-medium">Sign Up</Link>
+                        </p>
+                        <div className="mt-4"><GoogleLogin /></div>
+                    </form>
+                ) : (
+                    <form onSubmit={submitOtp} noValidate>
+                        <div className="mt-6 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/20 p-3 text-sm text-violet-800 dark:text-violet-200">
+                            ✅ A 6-digit verification code was sent to <strong>{tfState.email}</strong>.
+                            {tfState.expiresAt && <div className="mt-1 text-xs">Expires at {new Date(tfState.expiresAt).toLocaleTimeString()}</div>}
+                        </div>
+                        <input
+                            type="text" inputMode="numeric" maxLength={6} value={otp}
+                            onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            disabled={loading}
+                            placeholder="______"
+                            autoFocus
+                            autoComplete="one-time-code"
+                            className="mt-4 w-full p-3 text-center text-2xl tracking-[0.5em] rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        />
+                        <div className="mt-3 flex justify-between text-sm">
+                            <button type="button"
+                                onClick={resend} disabled={loading || resendDisabled}
+                                className="text-violet-600 hover:text-violet-700 disabled:text-gray-400"
+                            >{resendDisabled ? `Resend in ${fmt(tfState.resendSecondsLeft)}` : 'Resend code'}</button>
+                            <button type="button"
+                                onClick={() => { setStep('credentials'); setOtp(''); }}
+                                className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                                disabled={loading}
+                            >Back</button>
+                        </div>
+                        <button
+                            type="submit" disabled={loading}
+                            className="w-full mt-5 p-3 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg disabled:opacity-50 transition"
+                        >{loading ? 'Verifying…' : 'Verify and Continue'}</button>
+                    </form>
+                )}
             </div>
         </div>
     );

@@ -1,4 +1,4 @@
-// D:\Vingo\backend\utils\emailTemplates.js
+// backend\utils\emailTemplates.js
 
 export const getVerificationEmailTemplate = (name, verificationLink) => {
     return `

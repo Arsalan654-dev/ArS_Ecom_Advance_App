@@ -1,4 +1,4 @@
-// D:\Vingo\backend\utils\emailQueue.js - New file for background email sending
+// backend\utils\emailQueue.js
 
 import { setTimeout } from 'timers/promises';
 

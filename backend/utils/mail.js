@@ -1,4 +1,5 @@
 // backend/utils/mail.js
+
 import '../config/env.js';
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY;

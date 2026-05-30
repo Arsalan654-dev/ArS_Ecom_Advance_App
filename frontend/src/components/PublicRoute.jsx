@@ -1,4 +1,4 @@
-// components/PublicRoute.jsx (Naya file banao)
+/* frontend/src/components/PublicRoute.jsx */
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';

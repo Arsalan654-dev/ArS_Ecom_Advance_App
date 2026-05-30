@@ -1,3 +1,5 @@
+/* frontend/src/components/GoogleLogin.jsx */
+
 import React, { useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { FaGoogle } from 'react-icons/fa';

@@ -1,4 +1,4 @@
-// D:\Vingo\backend\models\address.model.js
+// backend\models\address.model.js
 
 import mongoose from "mongoose";
 

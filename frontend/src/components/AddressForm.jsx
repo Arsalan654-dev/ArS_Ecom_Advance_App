@@ -1,4 +1,4 @@
-// D:\Vingo\frontend\src\components\AddressForm.jsx
+/* frontend/src/components/AddressForm.jsx */
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
