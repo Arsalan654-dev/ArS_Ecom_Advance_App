@@ -1,5 +1,3 @@
-/* frontend/src/components/GoogleLogin.jsx */
-
 import React, { useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { FaGoogle } from 'react-icons/fa';
@@ -49,8 +47,7 @@ const GoogleLogin = () => {
 
                 console.log('Backend Response:', res.data);
 
-
-                // YEH CHECK ADD KARO - 2FA Required case handle
+                // Check for 2FA Required case
                 if (res.data.twoFactorRequired) {
                     // Store challenge token for 2FA
                     sessionStorage.setItem('twoFactorChallengeToken', res.data.challengeToken);
@@ -63,10 +60,7 @@ const GoogleLogin = () => {
                     return;
                 }
 
-
-
                 if (res.data.success) {
-
                     localStorage.clear();
 
                     const token = res.data.token;
@@ -74,7 +68,6 @@ const GoogleLogin = () => {
 
                     localStorage.setItem('token', token);
                     localStorage.setItem('user', JSON.stringify(res.data.user));
-
 
                     console.log("Token stored:", res.data.token);
                     console.log("User stored:", res.data.user);
@@ -101,6 +94,7 @@ const GoogleLogin = () => {
 
     return (
         <button
+            type="button"  // ✅ IMPORTANT: Prevents form submission
             onClick={() => login()}
             disabled={loading}
             className="w-full mt-4 p-3 border rounded-md flex items-center justify-center gap-2 hover:bg-gray-100 transition duration-300 disabled:opacity-50"

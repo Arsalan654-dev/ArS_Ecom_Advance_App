@@ -1,21 +1,15 @@
-/* frontend/src/components/PublicRoute.jsx */
+import React from "react";
+import { Navigate } from "react-router-dom";
 
-import React from 'react';
-import { Navigate } from 'react-router-dom';
+export const PublicRoute = ({ children }) => {
+  const token = localStorage.getItem("token");
+  const isAuthenticated = token && token !== "undefined" && token !== "null";
 
-const PublicRoute = ({ children }) => {
-    const token = localStorage.getItem('token');
-    
-    // Check if user is authenticated
-    const isAuthenticated = token && token !== 'undefined' && token !== 'null';
-    
-    if (isAuthenticated) {
-        // Already logged in, redirect to dashboard
-        return <Navigate to="/dashboard" replace />;
-    }
-    
-    // Not logged in, show public page
-    return children;
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
 };
 
 export default PublicRoute;

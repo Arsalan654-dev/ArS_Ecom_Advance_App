@@ -975,57 +975,39 @@ export const uploadProfilePicture = async (req, res) => {
     }
 };
 
-// Delete User Account
-// Add this import at the top of auth.controllers.js if not already there:
-// import Address from "../models/address.model.js";
 
+// Delete User Account - Simplified version without password check
 export const deleteAccount = async (req, res) => {
     try {
         const userId = req.userId;
-        const { password, confirmation } = req.body;
+        const { confirmation } = req.body;
 
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
 
-
-        // ═══ Branch 1: Google-only user (no password set) ═══
-        if (!user.password) {
-            // Require typed confirmation as safety check
-            if (!confirmation || String(confirmation).trim().toUpperCase() !== 'DELETE') {
-                return res.status(400).json({
-                    error: "Please type DELETE to confirm account deletion",
-                    requiresTypedConfirmation: true
-                });
-            }
-            console.log(`🗑️  Deleting Google-only user (confirmation match): ${user._id}`);
+        // ✅ Simplified: Just check typed confirmation
+        if (!confirmation || String(confirmation).trim().toUpperCase() !== 'DELETE') {
+            return res.status(400).json({
+                error: "Please type DELETE to confirm account deletion",
+                requiresTypedConfirmation: true
+            });
         }
 
-        else {
-            if (!password) {
-                return res.status(400).json({ error: "Password is required to delete account" });
-            }
-            const isMatch = await bcrypt.compare(password, user.password);
-            if (!isMatch) {
-                return res.status(400).json({ error: "Password is incorrect" });
-            }
-            console.log(`🗑️  Deleting user (password verified): ${user._id}`);
-        }
+        console.log(`🗑️ Deleting user (confirmed with DELETE): ${user._id}`);
 
-        // ✅ EXPLICIT CASCADE DELETE — most reliable, no Mongoose magic
         // 1. Delete all addresses belonging to this user
         const addressResult = await Address.deleteMany({ user: userId });
         console.log(`✅ Deleted ${addressResult.deletedCount} address(es) for user ${userId}`);
 
-        // 2. (Optional) Delete avatar from Cloudinary if exists
+        // 2. Delete avatar from Cloudinary if exists
         if (user.avatarPublicId) {
             try {
-                const { v2: cloudinary } = await import('cloudinary');
-                await cloudinary.uploader.destroy(user.avatarPublicId);
+                await deleteFromCloudinary(user.avatarPublicId);
                 console.log(`✅ Deleted avatar from Cloudinary: ${user.avatarPublicId}`);
             } catch (cloudErr) {
-                console.warn("⚠️  Could not delete Cloudinary avatar:", cloudErr.message);
+                console.warn("⚠️ Could not delete Cloudinary avatar:", cloudErr.message);
                 // Don't fail the whole deletion if Cloudinary fails
             }
         }
@@ -1056,7 +1038,6 @@ export const deleteAccount = async (req, res) => {
         });
     }
 };
-
 
 // Download Profile as PDF
 export const downloadProfilePDF = async (req, res) => {

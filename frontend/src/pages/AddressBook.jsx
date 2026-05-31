@@ -1,5 +1,3 @@
-/* frontend/src/pages/AddressBook.jsx */
-
 import React, { useState, useEffect } from 'react';
 import {
     IoMdAdd, IoMdTrash, IoMdCreate, IoMdHome, IoMdBusiness, IoMdPin
@@ -169,11 +167,12 @@ const AddressBook = () => {
                 </div>
             )}
 
-            {/* Form modal */}
+            {/* Form modal - FIXED for laptop screens */}
             {showForm && (
                 <div className="fixed inset-0 z-50 bg-black/60 flex items-start md:items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full my-8 border border-gray-200 dark:border-gray-800">
-                        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex justify-between items-center rounded-t-2xl">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full my-8 border border-gray-200 dark:border-gray-800 
+                                    max-h-[90vh] overflow-y-auto">
+                        <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex justify-between items-center rounded-t-2xl z-10">
                             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
                                 {editing ? 'Edit Address' : 'Add New Address'}
                             </h2>

@@ -1,5 +1,3 @@
-// frontend/src/pages/SignIn.jsx
-
 import React, { useEffect, useMemo, useState } from 'react';
 import { FaRegEye, FaRegEyeSlash } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
@@ -57,7 +55,6 @@ const SignIn = () => {
         }
     };
 
-    // ✅ Form onSubmit — triggered by Enter key OR button click
     const submitCreds = async (e) => {
         if (e?.preventDefault) e.preventDefault();
         if (!validate()) return;
@@ -81,7 +78,6 @@ const SignIn = () => {
             toast.success('Login successful!');
             navigate('/dashboard');
         } catch (err) {
-            // ✨ NEW: Google user trying password login
             if (err.response?.status === 403 && err.response?.data?.requiresPasswordSetup) {
                 toast.warning(err.response.data.message || 'Set a password to enable email login.');
                 navigate('/set-password', { state: { email: err.response.data.email || email } });
@@ -148,14 +144,13 @@ const SignIn = () => {
                 )}
 
                 {step === 'credentials' ? (
-                    // ✅ Wrap in <form> so Enter key submits
                     <form onSubmit={submitCreds} noValidate>
                         <div className="mt-6">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
                             <input
                                 type="email" value={email}
                                 onChange={e => { setEmail(e.target.value); errors.email && setErrors({ ...errors, email: '' }); }}
-                                placeholder="[email protected]"
+                                placeholder="you@example.com"
                                 disabled={loading}
                                 autoComplete="email"
                                 className={`mt-1 w-full p-3 rounded-lg border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-violet-500 ${errors.email ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'}`}
@@ -190,7 +185,6 @@ const SignIn = () => {
                         <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-4">
                             Don't have an account? <Link to="/signup" className="text-violet-600 hover:text-violet-700 font-medium">Sign Up</Link>
                         </p>
-                        <div className="mt-4"><GoogleLogin /></div>
                     </form>
                 ) : (
                     <form onSubmit={submitOtp} noValidate>
@@ -224,6 +218,11 @@ const SignIn = () => {
                         >{loading ? 'Verifying…' : 'Verify and Continue'}</button>
                     </form>
                 )}
+                
+                {/* ✅ Google button outside any form - prevents form submission */}
+                <div className="mt-4 relative z-10">
+                    <GoogleLogin />
+                </div>
             </div>
         </div>
     );
