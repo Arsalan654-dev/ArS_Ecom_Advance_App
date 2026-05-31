@@ -1,3 +1,5 @@
+// frontend\src\pages\SignIn.jsx
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { FaRegEye, FaRegEyeSlash } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';

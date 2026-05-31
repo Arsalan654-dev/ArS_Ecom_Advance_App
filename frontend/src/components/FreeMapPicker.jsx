@@ -1,3 +1,5 @@
+// frontend\src\components\FreeMapPicker.jsx
+
 import React, { useState, useEffect, useRef } from "react";
 import { MapContainer as OriginalMapContainer, TileLayer as OriginalTileLayer, Marker as OriginalMarker, useMapEvents } from "react-leaflet";
 import L from "leaflet";

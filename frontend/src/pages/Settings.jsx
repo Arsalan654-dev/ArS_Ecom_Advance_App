@@ -1,3 +1,5 @@
+// frontend\src\pages\Settings.jsx
+
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";

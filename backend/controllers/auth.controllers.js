@@ -807,17 +807,25 @@ export const updateProfile = async (req, res) => {
 export const getProfile = async (req, res) => {
     try {
         const userId = req.userId;
-        const user = await User.findById(userId).select("-password -resetOtp -otpExpires");
+        const user = await User.findById(userId).select("+password");
 
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
         const userObj = user.toObject();
-        userObj.hasPassword = !!user.password;        // ✨ NEW: tells frontend whether to show Set vs Change
+        const hasPassword = !!user.password;        // ✨ NEW: tells frontend whether to show Set vs Change
         delete userObj.password;                      // never leak password hash
         delete userObj.resetOtp;
         delete userObj.twoFactorOtp;
         delete userObj.emailVerificationToken;
+        delete userObj.twoFactorOtpExpires;
+        delete userObj.twoFactorOtpPurpose;
+        delete userObj.twoFactorOtpAttempts;
+        delete userObj.twoFactorLastSentAt;
+        delete userObj.emailVerificationToken;
+        delete userObj.emailVerificationExpires;
+
+        userObj.hasPassword = hasPassword;
 
         return res.status(200).json({ user: userObj });
     } catch (error) {
