@@ -3,7 +3,7 @@ import { Route, Routes, Navigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
-import SignUp from "./pages/SignUp"; // Standard naming cased file
+import SignUp from "./pages/SignuP"; // Standard naming cased file
 import SignIn from "./pages/SignIn";
 import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
