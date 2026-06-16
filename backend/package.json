@@ -16,6 +16,7 @@
   "dependencies": {
     "@getbrevo/brevo": "^5.0.4",
     "@react-oauth/google": "^0.13.5",
+    "@stripe/stripe-js": "^9.7.0",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.0",
     "cookie-parser": "^1.4.7",
@@ -31,6 +32,10 @@
     "nodemon": "^3.1.14",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "pdfkit": "^0.14.0"
+    "pdfkit": "^0.14.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "stripe": "^22.2.0",
+    "web-push": "^3.6.7"
   }
 }

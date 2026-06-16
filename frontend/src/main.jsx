@@ -6,6 +6,8 @@ import { BrowserRouter } from "react-router-dom";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { ThemeProvider } from "./context/ThemeContext";
 import App from "./App";
+import { CartProvider } from "./context/CartContext";
+import { OwnerProvider } from "./context/OwnerContext";
 import "./index.css";
 
 import "leaflet/dist/leaflet.css";
@@ -18,10 +20,14 @@ createRoot(document.getElementById("root")).render(
   <StrictMode>
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <ThemeProvider>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </ThemeProvider>
-    </GoogleOAuthProvider>
-  </StrictMode>
+        <OwnerProvider>
+           <CartProvider>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+          </CartProvider>
+         </OwnerProvider>
+       </ThemeProvider>
+     </GoogleOAuthProvider>
+   </StrictMode>
 );

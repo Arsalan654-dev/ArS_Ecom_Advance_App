@@ -24,12 +24,12 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ["user", "owner", "deliveryBoy"],
+        enum: ["user", "owner", "deliveryBoy", "admin"],
         default: "user"
     },
     googleId: {
         type: String,
-        default:undefined,
+        default: undefined,
         index: { unique: true, sparse: true }
     },
     isGoogleVerified: {
@@ -44,7 +44,7 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: null
     },
-     addresses: [{
+    addresses: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Address"
     }],
@@ -101,6 +101,52 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    restaurantId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Restaurant',
+        default: null
+    },
+    businessName: {
+        type: String,
+        default: null
+    },
+    businessLicense: {
+        type: String,
+        default: null
+    },
+    stripeAccountId: {
+        type: String,
+        default: null
+    },
+    balance: {
+        type: Number,
+        default: 0
+    },
+    earnings: {
+        type: Number,
+        default: 0
+    },
+    payoutHistory: [{
+        amount: Number,
+        status: String,
+        stripePayoutId: String,
+        createdAt: Date
+    }],
+    businessVerified: {
+        type: Boolean,
+        default: false
+    },
+    location: {
+        type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+        },
+        coordinates: {
+            type: [Number],
+            default: [0, 0]
+        }
+    },
 }, {
     timestamps: true
 });
@@ -122,40 +168,43 @@ async function cascadeDeleteAddresses(userId) {
 
 // 1. Document middleware (when calling user.deleteOne() on an instance)
 userSchema.pre('deleteOne', { document: true, query: false }, async function () {
-    
-        await cascadeDeleteAddresses(this._id);
-      
-   
+
+    await cascadeDeleteAddresses(this._id);
+
+
 });
 
 // 2. Query middleware (when calling User.deleteOne({ _id: ... }))
 userSchema.pre('deleteOne', { document: false, query: true }, async function () {
 
-        const doc = await this.model.findOne(this.getFilter()).select('_id');
-        if (doc) await cascadeDeleteAddresses(doc._id);
-    
+    const doc = await this.model.findOne(this.getFilter()).select('_id');
+    if (doc) await cascadeDeleteAddresses(doc._id);
+
 });
 
 // 3. findOneAndDelete / findByIdAndDelete
 userSchema.pre('findOneAndDelete', async function () {
-    
-        const doc = await this.model.findOne(this.getFilter()).select('_id');
-        if (doc) await cascadeDeleteAddresses(doc._id);
-       
+
+    const doc = await this.model.findOne(this.getFilter()).select('_id');
+    if (doc) await cascadeDeleteAddresses(doc._id);
+
 });
 
 // 4. deleteMany — bulk delete users
 userSchema.pre('deleteMany', async function () {
-  
-        const docs = await this.model.find(this.getFilter()).select('_id');
-        const ids = docs.map(d => d._id);
-        if (ids.length) {
-            const Address = mongoose.model('Address');
-            const result = await Address.deleteMany({ user: { $in: ids } });
-            console.log(`✅ [Hook] Bulk cascade-deleted ${result.deletedCount} addresses for ${ids.length} users`);
-        }
-    
+
+    const docs = await this.model.find(this.getFilter()).select('_id');
+    const ids = docs.map(d => d._id);
+    if (ids.length) {
+        const Address = mongoose.model('Address');
+        const result = await Address.deleteMany({ user: { $in: ids } });
+        console.log(`✅ [Hook] Bulk cascade-deleted ${result.deletedCount} addresses for ${ids.length} users`);
+    }
+
 });
+
+// Create 2dsphere index for location-based queries
+userSchema.index({ location: "2dsphere" });
 
 
 
