@@ -24,6 +24,9 @@ import webhookRouter from './routes/webhook.routes.js';
 import locationRouter from './routes/location.routes.js';
 import notificationRouter from './routes/notification.routes.js';
 import connectRouter from './routes/connect.routes.js';
+import chatbotRouter from './routes/chatbot.routes.js';
+import adminRouter from './routes/admin.routes.js';
+import cartRouter from './routes/cart.routes.js';
 
 //socket
 import { initializeSocket } from './socket.js';
@@ -91,7 +94,10 @@ app.use("/api/delivery", deliveryRouter);
 app.use("/api/payment", paymentRouter);
 app.use("/api/location", locationRouter);
 app.use("/api/connect", connectRouter);
-app.use("/api/notifications", notificationRouter); 
+app.use("/api/notifications", notificationRouter);
+app.use("/api/chatbot", chatbotRouter);
+app.use("/api/cart", cartRouter);
+app.use("/api/admin", adminRouter);
 
 initializeSocket(server);
 

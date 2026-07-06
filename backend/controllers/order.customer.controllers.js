@@ -5,6 +5,7 @@ import Restaurant from '../models/restaurant.model.js';
 import Address from '../models/address.model.js';
 import PromoCode from '../models/promoCode.model.js';
 import Stripe from 'stripe';
+import { sendToUser } from '../socket.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -107,6 +108,19 @@ export const createOrder = async (req, res) => {
             // Clear the cart
             cart.items = [];
             await cart.save();
+
+            // Send notification to restaurant owner
+            try {
+                if (restaurant?.owner) {
+                    await sendToUser(restaurant.owner, {
+                        type: 'new_order',
+                        title: "New Order Received! 🎉",
+                        message: `A new COD order #${order._id.toString().slice(-8)} has been placed at your restaurant.`,
+                        data: { orderId: order._id },
+                        link: `/owner/orders/${order._id}`
+                    }, true);
+                }
+            } catch (_) {}
 
             return res.status(201).json({
                 success: true,

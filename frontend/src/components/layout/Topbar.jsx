@@ -19,6 +19,7 @@ import {
   MdAnalytics,
   MdShoppingBag,
   MdShoppingCart,
+  MdDashboard,
 } from "react-icons/md";
 import NotificationBell from "../NotificationBell";
 
@@ -133,6 +134,22 @@ export const Topbar = ({ onToggleSidebar, onOpenMobile }) => {
               </div>
               
               {/* Role-specific quick links */}
+              {userRole === "admin" && (
+                <>
+                  <button
+                    onClick={() => { setMenuOpen(false); navigate("/admin/dashboard"); }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 cursor-pointer"
+                  >
+                    <MdDashboard size={16} /> Dashboard
+                  </button>
+                  <button
+                    onClick={() => { setMenuOpen(false); navigate("/admin/restaurants"); }}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 cursor-pointer"
+                  >
+                    <MdStore size={16} /> Restaurants
+                  </button>
+                </>
+              )}
               {userRole === "owner" && (
                 <>
                   <button

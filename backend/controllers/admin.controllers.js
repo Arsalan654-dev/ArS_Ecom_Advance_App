@@ -2,6 +2,7 @@
 import Order from '../models/order.model.js';
 import User from '../models/user.model.js';
 import Restaurant from '../models/restaurant.model.js';
+import FoodItem from '../models/foodItem.model.js';
 import WebhookEvent from '../models/WebhookEvent.model.js';
 import Stripe from 'stripe';
 
@@ -306,6 +307,188 @@ export const getStripeAccount = async (req, res) => {
         
     } catch (error) {
         console.error("Get stripe account error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// ─── Restaurant Approval System ───────────────────────────────────────────────
+
+// Get all restaurants with filters (for admin panel)
+export const adminGetAllRestaurants = async (req, res) => {
+    try {
+        const { page = 1, limit = 20, status, search } = req.query;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+        if (status) filter.status = status;
+        if (search) {
+            filter.$or = [
+                { businessName: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        const restaurants = await Restaurant.find(filter)
+            .populate('owner', 'fullName email mobile')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const total = await Restaurant.countDocuments(filter);
+
+        res.json({
+            success: true,
+            restaurants,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(total / limit),
+                totalItems: total,
+                itemsPerPage: parseInt(limit)
+            }
+        });
+    } catch (error) {
+        console.error("Admin get all restaurants error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Get single restaurant details (admin view)
+export const adminGetRestaurantDetail = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const restaurant = await Restaurant.findById(id)
+            .populate('owner', 'fullName email mobile phone');
+
+        if (!restaurant) {
+            return res.status(404).json({ error: "Restaurant not found" });
+        }
+
+        const foodItems = await FoodItem.find({ restaurant: id })
+            .populate('category', 'name');
+
+        res.json({
+            success: true,
+            restaurant,
+            foodItems
+        });
+    } catch (error) {
+        console.error("Admin get restaurant detail error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Approve or reject restaurant
+export const adminUpdateRestaurantStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, rejectionReason } = req.body;
+
+        if (!['approved', 'rejected', 'suspended'].includes(status)) {
+            return res.status(400).json({ error: "Invalid status. Must be: approved, rejected, or suspended" });
+        }
+
+        const restaurant = await Restaurant.findById(id);
+        if (!restaurant) {
+            return res.status(404).json({ error: "Restaurant not found" });
+        }
+
+        restaurant.status = status;
+        restaurant.adminRejectionReason = rejectionReason || null;
+        await restaurant.save();
+
+        // If approved, update owner role
+        if (status === 'approved') {
+            await User.findByIdAndUpdate(restaurant.owner, {
+                role: 'owner',
+                businessName: restaurant.businessName,
+                restaurantId: restaurant._id
+            });
+        }
+
+        // If rejected, revert owner role
+        if (status === 'rejected') {
+            await User.findByIdAndUpdate(restaurant.owner, {
+                $unset: { restaurantId: "" }
+            });
+        }
+
+        const populated = await restaurant.populate('owner', 'fullName email mobile');
+
+        res.json({
+            success: true,
+            message: `Restaurant ${status} successfully`,
+            restaurant: populated
+        });
+    } catch (error) {
+        console.error("Admin update restaurant status error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Get all users (admin)
+export const adminGetAllUsers = async (req, res) => {
+    try {
+        const { page = 1, limit = 20, role, search } = req.query;
+        const skip = (page - 1) * limit;
+
+        const filter = {};
+        if (role) filter.role = role;
+        if (search) {
+            filter.$or = [
+                { fullName: { $regex: search, $options: 'i' } },
+                { email: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        const users = await User.find(filter)
+            .select('-password -resetOtp -twoFactorOtp -emailVerificationToken')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
+
+        const total = await User.countDocuments(filter);
+
+        res.json({
+            success: true,
+            users,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(total / limit),
+                totalItems: total,
+                itemsPerPage: parseInt(limit)
+            }
+        });
+    } catch (error) {
+        console.error("Admin get all users error:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Update user role (admin)
+export const adminUpdateUserRole = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { role } = req.body;
+
+        if (!['user', 'owner', 'deliveryBoy', 'admin'].includes(role)) {
+            return res.status(400).json({ error: "Invalid role" });
+        }
+
+        const user = await User.findByIdAndUpdate(id, { role }, { new: true })
+            .select('-password -resetOtp -twoFactorOtp -emailVerificationToken');
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        res.json({
+            success: true,
+            message: "User role updated successfully",
+            user
+        });
+    } catch (error) {
+        console.error("Admin update user role error:", error);
         res.status(500).json({ error: error.message });
     }
 };

@@ -62,6 +62,10 @@ const restaurantSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    adminRejectionReason: {
+        type: String,
+        default: null
+    },
     createdAt: {
         type: Date,
         default: Date.now

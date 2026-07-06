@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import ChatBot from "../ChatBot";
 
 export const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop
@@ -36,6 +37,9 @@ export const DashboardLayout = () => {
           </div>
         </main>
       </div>
+
+      {/* ChatBot - same widget as public layout */}
+      <ChatBot />
     </div>
   );
 };

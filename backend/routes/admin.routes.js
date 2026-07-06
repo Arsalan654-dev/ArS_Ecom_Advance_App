@@ -8,7 +8,12 @@ import {
     reprocessWebhook,
     getTransactions,
     getPlatformEarnings,
-    getStripeAccount
+    getStripeAccount,
+    adminGetAllRestaurants,
+    adminGetRestaurantDetail,
+    adminUpdateRestaurantStatus,
+    adminGetAllUsers,
+    adminUpdateUserRole
 } from '../controllers/admin.controllers.js';
 
 const adminRouter = express.Router();
@@ -24,5 +29,14 @@ adminRouter.post('/webhook-events/:id/reprocess', reprocessWebhook);
 adminRouter.get('/transactions', getTransactions);
 adminRouter.get('/platform-earnings', getPlatformEarnings);
 adminRouter.get('/stripe-account', getStripeAccount);
+
+// Restaurant management
+adminRouter.get('/restaurants', adminGetAllRestaurants);
+adminRouter.get('/restaurants/:id', adminGetRestaurantDetail);
+adminRouter.put('/restaurants/:id/status', adminUpdateRestaurantStatus);
+
+// User management
+adminRouter.get('/users', adminGetAllUsers);
+adminRouter.put('/users/:id/role', adminUpdateUserRole);
 
 export default adminRouter;

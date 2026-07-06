@@ -159,9 +159,13 @@ export const getFoodItemById = async (req, res) => {
 // Search food items
 export const searchFoodItems = async (req, res) => {
     try {
-        const { q, restaurantId, minPrice, maxPrice, page = 1, limit = 20 } = req.query;
+        const { q, restaurantId, minPrice, maxPrice, dietary, page = 1, limit = 20 } = req.query;
         
         const filter = { isAvailable: true };
+        
+        if (dietary) {
+            filter.dietary = dietary;
+        }
         
         if (q) {
             filter.$or = [

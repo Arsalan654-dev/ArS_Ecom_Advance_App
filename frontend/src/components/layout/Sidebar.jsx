@@ -26,6 +26,7 @@ import {
   MdHome,
   MdPayment,
   MdNotifications,
+  MdSmartToy,
 } from "react-icons/md";
 
 export const Sidebar = ({ collapsed = false, mobileOpen = false, onMobileClose }) => {
@@ -90,6 +91,16 @@ export const Sidebar = ({ collapsed = false, mobileOpen = false, onMobileClose }
         ...common,
       ];
     }
+
+    if (userRole === "admin") {
+      return [
+        { to: "/admin/dashboard", label: "Dashboard", icon: MdDashboard },
+        { to: "/admin/restaurants", label: "Restaurants", icon: MdStore },
+        { to: "/admin/payments", label: "Payments", icon: MdPayment },
+        { to: "/admin/chatbot", label: "VingoBot", icon: MdSmartToy },
+        ...common,
+      ];
+    }
     
     return common;
   };
@@ -99,12 +110,14 @@ export const Sidebar = ({ collapsed = false, mobileOpen = false, onMobileClose }
   const getRoleBadge = () => {
     if (userRole === "owner") return "Restaurant Owner";
     if (userRole === "deliveryBoy") return "Delivery Partner";
+    if (userRole === "admin") return "Administrator";
     return "Customer";
   };
 
   const getDashboardLink = () => {
     if (userRole === "owner") return "/owner/dashboard";
     if (userRole === "deliveryBoy") return "/delivery/assigned-orders";
+    if (userRole === "admin") return "/admin/dashboard";
     return "/dashboard";
   };
 

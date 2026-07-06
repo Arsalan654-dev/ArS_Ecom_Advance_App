@@ -12,6 +12,12 @@ const Cart = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (!token) {
+            toast.info("Please login to view your cart");
+            navigate("/signin");
+            return;
+        }
         fetchCart();
     }, []);
 

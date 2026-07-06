@@ -12,7 +12,46 @@ const OrderTracking = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchOrder();
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // Check if we arrived here after Stripe redirect (payment_pending)
+        const confirmAfterRedirect = async () => {
+            try {
+                const res = await axios.get(`${API_URL}/api/orders/${orderId}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    withCredentials: true,
+                });
+                const orderData = res.data.order;
+                setOrder(orderData);
+                
+                // If order is still payment_pending, try to confirm via query params
+                if (orderData?.status === 'payment_pending') {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const pi = urlParams.get('payment_intent');
+                    const redirectStatus = urlParams.get('redirect_status');
+                    
+                    if (pi && redirectStatus === 'succeeded') {
+                        await axios.post(`${API_URL}/api/payment/confirm-payment`,
+                            { paymentIntentId: pi, orderId },
+                            { headers: { Authorization: `Bearer ${token}` }, withCredentials: true }
+                        );
+                        // Re-fetch after confirmation
+                        const updated = await axios.get(`${API_URL}/api/orders/${orderId}`, {
+                            headers: { Authorization: `Bearer ${token}` },
+                            withCredentials: true,
+                        });
+                        setOrder(updated.data.order);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch order:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        confirmAfterRedirect();
         const interval = setInterval(fetchOrder, 15000);
         return () => clearInterval(interval);
     }, [orderId]);
@@ -27,17 +66,17 @@ const OrderTracking = () => {
             setOrder(res.data.order);
         } catch (error) {
             console.error("Failed to fetch order:", error);
-        } finally {
-            setLoading(false);
         }
     };
 
     const getStatusStep = () => {
         const steps = ["pending", "preparing", "ready", "out-for-delivery", "delivered"];
+        if (order?.status === 'payment_pending') return -1;
         return steps.indexOf(order?.status);
     };
 
     const statusConfig = {
+        payment_pending: { label: "Payment Pending", icon: MdCheckCircle, color: "bg-yellow-500" },
         pending: { label: "Order Received", icon: MdCheckCircle, color: "bg-gray-400" },
         preparing: { label: "Preparing", icon: MdRestaurant, color: "bg-blue-500" },
         ready: { label: "Ready", icon: MdCheckCircle, color: "bg-purple-500" },

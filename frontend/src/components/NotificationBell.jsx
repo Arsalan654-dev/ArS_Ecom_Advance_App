@@ -205,10 +205,19 @@ const NotificationBell = () => {
         return `${days}d ago`;
     };
 
+    const handleBellClick = () => {
+        const willOpen = !isOpen;
+        setIsOpen(willOpen);
+        // When opening dropdown, auto-mark all as read
+        if (willOpen && unreadCount > 0) {
+            markAllAsRead();
+        }
+    };
+
     return (
         <div className="relative" ref={dropdownRef}>
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={handleBellClick}
                 className="relative p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
                 title="Notifications"
             >

@@ -47,12 +47,23 @@ import DeliveryHistory from "./pages/delivery/DeliveryHistory";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
+import PublicLayout from "./components/layout/PublicLayout";
 import { useTheme } from "./context/ThemeContext";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminRestaurants from "./pages/admin/AdminRestaurants";
+import AdminPayments from "./pages/admin/AdminPayments";
+import AdminChatBot from "./pages/admin/AdminChatBot";
 import PaymentSettings from "./pages/PaymentSettings";
 import Notifications from "./pages/Notifications";
 import DeliveryTracking from "./pages/delivery/DeliveryTracking";
 import PaymentPage from "./pages/PaymentPage";
+
+// Guest/Public Pages
+import HomePage from "./pages/HomePage";
+import AllRestaurants from "./pages/AllRestaurants";
+import AllFoodItems from "./pages/AllFoodItems";
+import PublicRestaurantDetail from "./pages/PublicRestaurantDetail";
+import PublicFoodItemDetail from "./pages/PublicFoodItemDetail";
 
 const RoleBasedRoute = ({ children, allowedRoles }) => {
   const userRaw = localStorage.getItem("user");
@@ -108,6 +119,19 @@ export const App = () => {
         <Route path="/two-factor-verify" element={<TwoFactorVerify />} />
         <Route path="/set-password" element={<PublicRoute><SetPassword /></PublicRoute>} />
 
+        {/* Public/Guest Routes (no login required) */}
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/restaurants" element={<AllRestaurants />} />
+          <Route path="/food-items" element={<AllFoodItems />} />
+          <Route path="/food-item/:id" element={<PublicFoodItemDetail />} />
+          <Route path="/restaurant/:id" element={<PublicRestaurantDetail />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/payment/:orderId" element={<PaymentPage />} />
+          <Route path="/order-tracking/:orderId" element={<OrderTracking />} />
+        </Route>
+
         {/* Protected Routes with Dashboard Layout */}
         <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           {/* Common Routes - All Roles */}
@@ -123,13 +147,23 @@ export const App = () => {
               <AdminDashboard />
             </RoleBasedRoute>
           } />
-
-          {/* Shop and Restaurant pages - Now inside layout */}
-          <Route path="/" element={
-            <RoleBasedRoute allowedRoles={["user"]}>
-              <Shop />
+          <Route path="/admin/restaurants" element={
+            <RoleBasedRoute allowedRoles={["admin"]}>
+              <AdminRestaurants />
             </RoleBasedRoute>
           } />
+          <Route path="/admin/payments" element={
+            <RoleBasedRoute allowedRoles={["admin"]}>
+              <AdminPayments />
+            </RoleBasedRoute>
+          } />
+          <Route path="/admin/chatbot" element={
+            <RoleBasedRoute allowedRoles={["admin"]}>
+              <AdminChatBot />
+            </RoleBasedRoute>
+          } />
+
+          {/* Shop and Restaurant pages - Now inside layout */}
           <Route path="/shop" element={
             <RoleBasedRoute allowedRoles={["user"]}>
               <Shop />

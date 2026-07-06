@@ -21,6 +21,13 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState("cash");
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast.info("Please login to checkout");
+      navigate("/signin");
+      return;
+    }
+    fetchCart(); // Refresh cart data from backend
     fetchAddresses();
   }, []);
 
