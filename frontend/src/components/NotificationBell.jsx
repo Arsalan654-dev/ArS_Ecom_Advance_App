@@ -20,9 +20,15 @@ const NotificationBell = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
 
     useEffect(() => {
+        let intervalId;
         if (user._id) {
             fetchNotifications();
-            connectSocket();
+            if (import.meta.env.VITE_SOCKET_ENABLED !== 'false') {
+                connectSocket();
+            }
+            // Vercel serverless functions cannot keep Socket.IO connections open,
+            // so fall back to lightweight polling for near-real-time updates.
+            intervalId = setInterval(() => fetchNotifications(true), 30000);
         }
         
         const handleClickOutside = (event) => {
@@ -33,6 +39,7 @@ const NotificationBell = () => {
         document.addEventListener('mousedown', handleClickOutside);
         
         return () => {
+            if (intervalId) clearInterval(intervalId);
             if (socket) socket.disconnect();
             document.removeEventListener('mousedown', handleClickOutside);
         };
@@ -86,9 +93,9 @@ const NotificationBell = () => {
         }
     };
 
-    const fetchNotifications = async () => {
+    const fetchNotifications = async (silent = false) => {
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
             const token = localStorage.getItem('token');
             const res = await axios.get(`${API_URL}/api/notifications?limit=50`, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -99,7 +106,7 @@ const NotificationBell = () => {
         } catch (error) {
             console.error("Failed to fetch notifications:", error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
