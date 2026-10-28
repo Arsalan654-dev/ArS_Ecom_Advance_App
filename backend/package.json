@@ -8,7 +8,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon index.js",
-    "start": "nodeindex.js"
+    "start": "node index.js"
   },
   "engines": {
     "node": "24.x"
